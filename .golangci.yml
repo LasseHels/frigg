@@ -1,0 +1,237 @@
+version: "2"
+linters:
+  enable:
+    - errorlint
+    - gocritic
+    - godot
+    - lll
+    - misspell
+    - nestif
+    - nilnil
+    - nonamedreturns
+    - predeclared
+    - promlinter
+    - reassign
+    - recvcheck
+    - revive
+    - rowserrcheck
+    - spancheck
+    - testifylint
+    - unconvert
+    - unparam
+    - usestdlibvars
+    - usetesting
+    - wastedassign
+    - whitespace
+    - sloglint
+    - nolintlint
+  settings:
+    errcheck:
+      check-blank: true
+      exclude-functions:
+        - (github.com/go-kit/log.Logger).Log
+    gocritic:
+      enabled-checks:
+        - badLock
+        - badRegexp
+        - badSorting
+        - badSyncOnceFunc
+        - boolExprSimplify
+        - builtinShadow
+        - builtinShadowDecl
+        - commentedOutCode
+        - commentedOutImport
+        - deferInLoop
+        - deferUnlambda
+        - docStub
+        - dupImport
+        - dynamicFmtString
+        - emptyDecl
+        - emptyFallthrough
+        - emptyStringTest
+        - equalFold
+        - evalOrder
+        - exposedSyncMutex
+        - externalErrorReassign
+        - filepathJoin
+        - hexLiteral
+        - httpNoBody
+        - hugeParam
+        - importShadow
+        - indexAlloc
+        - initClause
+        - methodExprCall
+        - nestingReduce
+        - nilValReturn
+        - octalLiteral
+        - paramTypeCombine
+        - preferDecodeRune
+        - preferFilepathJoin
+        - preferFprint
+        - preferStringWriter
+        - preferWriteByte
+        - ptrToRefParam
+        - rangeAppendAll
+        - rangeExprCopy
+        - rangeValCopy
+        - redundantSprint
+        - regexpPattern
+        - regexpSimplify
+        - returnAfterHttpError
+        - ruleguard
+        - sliceClear
+        - sloppyReassign
+        - sortSlice
+        - sprintfQuotedString
+        - sqlQuery
+        - stringConcatSimplify
+        - stringXbytes
+        - stringsCompare
+        - syncMapLoadAndDelete
+        - timeExprSimplify
+        - todoCommentWithoutDetail
+        - tooManyResultsChecker
+        - truncateCmp
+        - typeAssertChain
+        - typeDefFirst
+        - typeUnparen
+        - uncheckedInlineErr
+        - unlabelStmt
+        - unnecessaryBlock
+        - unnecessaryDefer
+        - weakCond
+        - yodaStyleExpr
+    govet:
+      disable:
+        - fieldalignment
+      enable-all: true
+      settings:
+        shadow:
+          strict: true
+    lll:
+      line-length: 120
+    nestif:
+      min-complexity: 3
+    revive:
+      enable-all-rules: true
+      rules:
+        - name: line-length-limit
+          disabled: true
+        - name: add-constant
+          disabled: true
+        - name: max-public-structs
+          disabled: true
+        - name: function-length
+          disabled: true
+        - name: cognitive-complexity
+          disabled: true
+        - name: cyclomatic
+          disabled: true
+        - name: unused-receiver
+          disabled: true
+        - name: confusing-results
+          disabled: true
+        - name: unhandled-error
+          arguments:
+            - fmt.Print.*
+          severity: warning
+          disabled: false
+        - name: confusing-naming
+          severity: warning
+          disabled: true
+        - name: exported
+          disabled: true
+        - name: package-comments
+          disabled: true
+    rowserrcheck:
+      packages:
+        - github.com/jmoiron/sqlx
+    spancheck:
+      checks:
+        - end
+        - record-error
+        - set-status
+      ignore-check-signatures:
+        - (S|s)panErr
+        - (R|r)ecordErr
+    testifylint:
+      enable-all: true
+      disable:
+        - float-compare
+        - suite-dont-use-pkg
+    usestdlibvars:
+      http-method: true
+      http-status-code: true
+      time-weekday: true
+      time-month: true
+      time-layout: true
+      crypto-hash: true
+      default-rpc-path: true
+      sql-isolation-level: true
+      tls-signature-scheme: true
+      constant-kind: true
+    usetesting:
+      context-background: true
+      context-todo: true
+      os-chdir: true
+      os-mkdir-temp: true
+      os-setenv: true
+      os-temp-dir: true
+      os-create-temp: true
+    nolintlint:
+      allow-unused: false
+      require-specific: true
+    sloglint:
+      attr-only: true
+      static-msg: true
+      msg-style: capitalized
+      # https://github.com/go-simpler/sloglint/tree/0a750b14f11c89496b34f2c0f636f76e896b520e#forbidden-keys
+      forbidden-keys:
+        - time
+        - level
+        - msg
+        - source
+  exclusions:
+    generated: strict
+    presets:
+      - std-error-handling
+    rules:
+      - linters:
+          - govet
+        # We want strict shadow linting, but not for 'err', 'ctx' and 'ok' as these variables are commonly shadowed.
+        # See https://github.com/golangci/golangci-lint/issues/166#issuecomment-1464724451.
+        text: 'shadow: declaration of "(err|ctx|ok)" shadows declaration at'
+      - linters:
+          - revive
+        path: _test\.go
+        # Revive should warn us about unused parameters, but this check in particular is often noisy in test files.
+        # Unused parameters in test files is something we can live with.
+        # See https://github.com/golangci/golangci-lint/issues/4364#issuecomment-1935121366.
+        text: unused-parameter
+      - linters:
+          - nilnil
+        path: _test\.go
+        # Functions in test files are allowed to return nil, nil.
+        text: use a sentinel error instead
+      - linters:
+          - gocritic
+        path: _test\.go
+        text: hugeParam
+formatters:
+  enable:
+    - gci
+    - gofmt
+    - gofumpt
+  settings:
+    gci:
+      sections:
+        - standard
+        - default
+        - prefix(github.com/LasseHels/frigg)
+      custom-order: true
+    gofmt:
+      rewrite-rules:
+        - pattern: interface{}
+          replacement: any
+  exclusions:
+    generated: strict
