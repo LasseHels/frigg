@@ -2,8 +2,8 @@ on:
   workflow_call:
 
 jobs:
-  unit:
-    name: Unit
+  all:
+    name: All
     permissions:
       contents: read
     runs-on: ubuntu-22.04
@@ -15,4 +15,4 @@ jobs:
         with:
           go-version-file: 'go.mod'
       - name: Test
-        run: make test
+        run: make test-all
