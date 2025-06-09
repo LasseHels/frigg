@@ -1,12 +1,15 @@
 package frigg
 
 import (
+	"bytes"
 	"log/slog"
+	"os"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/multierr"
+	"gopkg.in/yaml.v3"
 
 	"github.com/LasseHels/frigg/pkg/server"
 )
@@ -14,6 +17,24 @@ import (
 type Config struct {
 	// TODO: Logger config.
 	Server server.Config `yaml:"server"`
+}
+
+// Load configuration from a YAML file at path.
+func (c *Config) Load(path string) error {
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return errors.Wrapf(err, "reading config file at path %q", path)
+	}
+
+	buf = []byte(os.ExpandEnv(string(buf)))
+
+	dec := yaml.NewDecoder(bytes.NewReader(buf))
+
+	if err := dec.Decode(c); err != nil {
+		return errors.Wrap(err, "parsing config file")
+	}
+
+	return nil
 }
 
 // Initialise Frigg from the provided Config.

@@ -9,6 +9,7 @@ import (
 	"gopkg.in/yaml.v3"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
+	"github.com/LasseHels/frigg/pkg/server"
 )
 
 //go:embed testdata
@@ -61,4 +62,53 @@ func TestConfig_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfig_Load(t *testing.T) {
+	type testCase struct {
+		configPath    string
+		expectedError string
+	}
+
+	tests := map[string]testCase{
+		"invalid yaml": {
+			configPath:    "testdata/invalid_yaml.yaml",
+			expectedError: "parsing config file: yaml: line 1: did not find expected key",
+		},
+		"file does not exist": {
+			configPath: "testdata/non_existent.yaml",
+			expectedError: `reading config file at path "testdata/non_existent.yaml": open testdata/non_existent.yaml:` +
+				` no such file or directory`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			var cfg frigg.Config
+			err := cfg.Load(tt.configPath)
+
+			if tt.expectedError == "" {
+				assert.NoError(t, err, "expected no error")
+			} else {
+				assert.ErrorContains(t, err, tt.expectedError, "error does not match expected")
+			}
+		})
+	}
+
+	t.Run("valid config", func(t *testing.T) {
+		t.Setenv("FRIGG_HOST", "pineapple")
+
+		var cfg frigg.Config
+		err := cfg.Load("testdata/valid_config.yaml")
+		require.NoError(t, err)
+		expectedConfig := frigg.Config{
+			Server: server.Config{
+				Host: "pineapple",
+				Port: 9898,
+			},
+		}
+		assert.Equal(t, expectedConfig, cfg)
+	})
 }
