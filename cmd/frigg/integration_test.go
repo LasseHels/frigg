@@ -26,6 +26,7 @@ func TestFriggIntegration(t *testing.T) {
 	// cancelled manually.
 	defer cancel()
 	eg, ctx := errgroup.WithContext(ctx)
+	release = "integration-test"
 
 	eg.Go(func() error {
 		return run(ctx, &out)
@@ -46,8 +47,8 @@ func TestFriggIntegration(t *testing.T) {
 	})
 
 	logs := out.String()
-	assert.Contains(t, logs, `"msg":"Registered route","path":"/health","methods":["GET"]`)
-	assert.Contains(t, logs, `"msg":"Registered route","path":"/metrics","methods":["GET"]`)
+	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/health","methods":["GET"]`)
+	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/metrics","methods":["GET"]`)
 
 	t.Run("shuts down gracefully", func(t *testing.T) {
 		cancel()
