@@ -1,6 +1,6 @@
 .PHONY: run
 run:
-	go run ./cmd/frigg/main.go
+	go run -ldflags="-X 'main.release=`git rev-parse --short=8 HEAD`'" ./cmd/frigg/main.go
 
 .PHONY: test
 test:

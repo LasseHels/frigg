@@ -18,6 +18,9 @@ import (
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
+// release is set through the linker at build time, generally from a git sha. Used for logging and error reporting.
+var release string
+
 func main() {
 	os.Exit(start())
 }
@@ -81,5 +84,8 @@ func logger(w io.Writer) *slog.Logger {
 	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
 		Level: slog.LevelInfo, // TODO: Read from configuration.
 	})
-	return slog.New(handler)
+	l := slog.New(handler)
+	l = l.With(slog.String("release", release))
+
+	return l
 }
