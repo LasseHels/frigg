@@ -19,11 +19,20 @@ type Config struct {
 	Server server.Config `yaml:"server"`
 }
 
-// NewConfig creates a new Config with default values.
-func NewConfig() *Config {
+// NewConfig creates a new Config with default values and loads configuration from the given path.
+func NewConfig(path string) (*Config, error) {
 	c := &Config{}
 	c.defaults()
-	return c
+
+	if err := c.load(path); err != nil {
+		return nil, errors.Wrap(err, "loading configuration")
+	}
+
+	if err := c.validate(); err != nil {
+		return nil, errors.Wrap(err, "validating configuration")
+	}
+
+	return c, nil
 }
 
 // defaults sets default values for the Config.
@@ -32,8 +41,8 @@ func (c *Config) defaults() {
 	c.Server.Port = 8080
 }
 
-// Load configuration from a YAML file at path.
-func (c *Config) Load(path string) error {
+// load configuration from a YAML file at path.
+func (c *Config) load(path string) error {
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return errors.Wrapf(err, "reading config file at path %q", path)
@@ -55,13 +64,13 @@ func (c *Config) Load(path string) error {
 }
 
 // Initialise Frigg from the provided Config.
-// Initialise assumes that Config is valid (see Validate).
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer) *Frigg {
 	s := server.New(c.Server, logger)
 	return New(logger, s, gatherer)
 }
 
-func (c *Config) Validate() error {
+// validate ensures the configuration is valid.
+func (c *Config) validate() error {
 	v := validator.New()
 
 	if err := v.Struct(c); err != nil {

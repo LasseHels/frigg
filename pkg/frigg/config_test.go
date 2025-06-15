@@ -1,44 +1,84 @@
 package frigg_test
 
 import (
-	"embed"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/yaml.v3"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
-//go:embed testdata
-var testdataFS embed.FS
-
-func TestConfig_Validate(t *testing.T) {
-	t.Parallel()
-
+func TestNewConfig(t *testing.T) {
 	type testCase struct {
-		configPath    string
-		expectedError string
+		configPath     string
+		expectedConfig *frigg.Config
+		expectedError  string
 	}
 
 	tests := map[string]testCase{
-		"missing server host": {
-			configPath:    "testdata/missing_host.yaml",
-			expectedError: "Key: 'Config.Server.Host' Error:Field validation for 'Host' failed on the 'required' tag",
-		},
-		"missing server port": {
-			configPath:    "testdata/missing_port.yaml",
-			expectedError: "Key: 'Config.Server.Port' Error:Field validation for 'Port' failed on the 'required' tag",
-		},
-		"invalid server port": {
-			configPath:    "testdata/invalid_port.yaml",
-			expectedError: "Key: 'Config.Server.Port' Error:Field validation for 'Port' failed on the 'min' tag",
+		"empty config file": {
+			configPath: "testdata/empty_config.yaml",
+			expectedConfig: &frigg.Config{
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+			},
+			expectedError: "",
 		},
 		"valid config": {
-			configPath:    "testdata/valid_config.yaml",
+			configPath: "testdata/valid_config.yaml",
+			expectedConfig: &frigg.Config{
+				Server: server.Config{
+					Host: "pomelo.com",
+					Port: 9898,
+				},
+			},
 			expectedError: "",
+		},
+		"missing host": {
+			configPath: "testdata/missing_host.yaml",
+			expectedConfig: &frigg.Config{
+				Server: server.Config{
+					Host: "localhost",
+					Port: 9876,
+				},
+			},
+			expectedError: "",
+		},
+		"missing port": {
+			configPath: "testdata/missing_port.yaml",
+			expectedConfig: &frigg.Config{
+				Server: server.Config{
+					Host: "pineapple.com",
+					Port: 8080,
+				},
+			},
+			expectedError: "",
+		},
+		"invalid port": {
+			configPath:     "testdata/invalid_port.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Server.Port' Error:" +
+				"Field validation for 'Port' failed on the 'min' tag",
+		},
+		"invalid yaml": {
+			configPath:     "testdata/invalid_yaml.yaml",
+			expectedConfig: nil,
+			expectedError:  "loading configuration: parsing config file: yaml: line 1: did not find expected key",
+		},
+		"empty path": {
+			configPath:     "",
+			expectedConfig: nil,
+			expectedError:  `loading configuration: reading config file at path "": open : no such file or directory`,
+		},
+		"file not found": {
+			configPath:     "testdata/nonexistent.yaml",
+			expectedConfig: nil,
+			expectedError: `loading configuration: reading config file at path "testdata/nonexistent.yaml":` +
+				` open testdata/nonexistent.yaml: no such file or directory`,
 		},
 	}
 
@@ -46,89 +86,28 @@ func TestConfig_Validate(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			configBytes, err := testdataFS.ReadFile(tt.configPath)
-			require.NoError(t, err, "failed to read test file")
+			cfg, err := frigg.NewConfig(tt.configPath)
+			assert.Equal(t, tt.expectedConfig, cfg, name)
 
-			var cfg frigg.Config
-			err = yaml.Unmarshal(configBytes, &cfg)
-			require.NoError(t, err, "failed to unmarshal config")
-
-			err = cfg.Validate()
-
-			if tt.expectedError == "" {
-				assert.NoError(t, err, "expected no validation error")
+			if tt.expectedError != "" {
+				require.EqualError(t, err, tt.expectedError, name)
 			} else {
-				assert.EqualError(t, err, tt.expectedError, "validation error does not match expected")
+				require.NoError(t, err, name)
 			}
 		})
 	}
-}
 
-func TestConfig_Load(t *testing.T) {
-	type testCase struct {
-		configPath    string
-		expectedError string
-	}
-
-	tests := map[string]testCase{
-		"invalid yaml": {
-			configPath:    "testdata/invalid_yaml.yaml",
-			expectedError: "parsing config file: yaml: line 1: did not find expected key",
-		},
-		"file does not exist": {
-			configPath: "testdata/non_existent.yaml",
-			expectedError: `reading config file at path "testdata/non_existent.yaml": open testdata/non_existent.yaml:` +
-				` no such file or directory`,
-		},
-	}
-
-	for name, tt := range tests {
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-
-			var cfg frigg.Config
-			err := cfg.Load(tt.configPath)
-			assert.ErrorContains(t, err, tt.expectedError, "error does not match expected")
-		})
-	}
-
-	t.Run("valid config", func(t *testing.T) {
-		t.Setenv("FRIGG_HOST", "pineapple")
-
-		var cfg frigg.Config
-		err := cfg.Load("testdata/valid_config.yaml")
-		require.NoError(t, err)
-		expectedConfig := frigg.Config{
+	t.Run("expands environment variables", func(t *testing.T) {
+		t.Setenv("FRIGG_HOST", "banana.com")
+		expectedConfig := &frigg.Config{
 			Server: server.Config{
-				Host: "pineapple",
-				Port: 9898,
+				Host: "banana.com",
+				Port: 1111,
 			},
 		}
-		assert.Equal(t, expectedConfig, cfg)
-	})
 
-	t.Run("loads an empty config file", func(t *testing.T) {
-		t.Parallel()
-
-		var cfg frigg.Config
-		err := cfg.Load("testdata/empty_config.yaml")
+		cfg, err := frigg.NewConfig("testdata/env_expansion_config.yaml")
 		require.NoError(t, err)
-
-		expectedConfig := frigg.Config{}
 		assert.Equal(t, expectedConfig, cfg)
 	})
-}
-
-func TestNewConfig(t *testing.T) {
-	t.Parallel()
-
-	cfg := frigg.NewConfig()
-
-	expectedConfig := &frigg.Config{
-		Server: server.Config{
-			Host: "localhost",
-			Port: 8080,
-		},
-	}
-	assert.Equal(t, expectedConfig, cfg, "NewConfig should return config with default values")
 }
