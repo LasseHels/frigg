@@ -106,4 +106,29 @@ func TestConfig_Load(t *testing.T) {
 		}
 		assert.Equal(t, expectedConfig, cfg)
 	})
+
+	t.Run("loads an empty config file", func(t *testing.T) {
+		t.Parallel()
+
+		var cfg frigg.Config
+		err := cfg.Load("testdata/empty_config.yaml")
+		require.NoError(t, err)
+
+		expectedConfig := frigg.Config{}
+		assert.Equal(t, expectedConfig, cfg)
+	})
+}
+
+func TestNewConfig(t *testing.T) {
+	t.Parallel()
+
+	cfg := frigg.NewConfig()
+
+	expectedConfig := &frigg.Config{
+		Server: server.Config{
+			Host: "localhost",
+			Port: 8080,
+		},
+	}
+	assert.Equal(t, expectedConfig, cfg, "NewConfig should return config with default values")
 }

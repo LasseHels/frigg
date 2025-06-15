@@ -19,6 +19,19 @@ type Config struct {
 	Server server.Config `yaml:"server"`
 }
 
+// NewConfig creates a new Config with default values.
+func NewConfig() *Config {
+	c := &Config{}
+	c.defaults()
+	return c
+}
+
+// defaults sets default values for the Config.
+func (c *Config) defaults() {
+	c.Server.Host = "localhost"
+	c.Server.Port = 8080
+}
+
 // Load configuration from a YAML file at path.
 func (c *Config) Load(path string) error {
 	buf, err := os.ReadFile(path)
@@ -27,6 +40,10 @@ func (c *Config) Load(path string) error {
 	}
 
 	buf = []byte(os.ExpandEnv(string(buf)))
+
+	if len(bytes.TrimSpace(buf)) == 0 {
+		return nil
+	}
 
 	dec := yaml.NewDecoder(bytes.NewReader(buf))
 
