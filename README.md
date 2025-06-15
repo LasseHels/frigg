@@ -5,12 +5,11 @@ Frigg analyses Grafana dashboard usage and deletes unused dashboards
 ## Configuration
 
 Frigg is configured using a YAML configuration file. The path to this file is provided using the `-config.file` flag when starting Frigg:
-
 ```bash
 frigg -config.file=/path/to/config.yaml
 ```
 
-### Format
+### Structure
 
 Below is a complete example of Frigg's configuration file structure:
 ```yaml
