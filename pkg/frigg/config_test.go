@@ -88,12 +88,7 @@ func TestConfig_Load(t *testing.T) {
 
 			var cfg frigg.Config
 			err := cfg.Load(tt.configPath)
-
-			if tt.expectedError == "" {
-				assert.NoError(t, err, "expected no error")
-			} else {
-				assert.ErrorContains(t, err, tt.expectedError, "error does not match expected")
-			}
+			assert.ErrorContains(t, err, tt.expectedError, "error does not match expected")
 		})
 	}
 
