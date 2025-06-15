@@ -49,16 +49,16 @@ func run(ctx context.Context, configPath string, w io.Writer) error {
 		return errors.Errorf("required flag -%s missing", flagConfigFile)
 	}
 
-	l := logger(w)
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
 
-	l.Info("Loading configuration file", slog.String("path", configPath))
+	_, _ = fmt.Fprintf(w, "Loading configuration file from path %s\n", configPath)
 	cfg, err := frigg.NewConfig(configPath)
 	if err != nil {
 		return errors.Wrap(err, "reading configuration")
 	}
+	l := logger(w, cfg.Log.Level)
 
 	f := cfg.Initialise(l, registry)
 
@@ -89,9 +89,9 @@ func run(ctx context.Context, configPath string, w io.Writer) error {
 	return nil
 }
 
-func logger(w io.Writer) *slog.Logger {
+func logger(w io.Writer, level slog.Level) *slog.Logger {
 	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
-		Level: slog.LevelInfo, // TODO: Read from configuration.
+		Level: level,
 	})
 	l := slog.New(handler)
 	l = l.With(slog.String("release", release))

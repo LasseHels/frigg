@@ -11,11 +11,12 @@ import (
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 
+	"github.com/LasseHels/frigg/pkg/log"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
 type Config struct {
-	// TODO: Logger config.
+	Log    log.Config    `yaml:"log"`
 	Server server.Config `yaml:"server"`
 }
 
@@ -37,6 +38,7 @@ func NewConfig(path string) (*Config, error) {
 
 // defaults sets default values for the Config.
 func (c *Config) defaults() {
+	c.Log.Level = slog.LevelInfo
 	c.Server.Host = "localhost"
 	c.Server.Port = 8080
 }

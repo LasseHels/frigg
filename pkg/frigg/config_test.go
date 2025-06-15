@@ -1,12 +1,14 @@
 package frigg_test
 
 import (
+	"log/slog"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
+	"github.com/LasseHels/frigg/pkg/log"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -21,6 +23,9 @@ func TestNewConfig(t *testing.T) {
 		"empty config file": {
 			configPath: "testdata/empty_config.yaml",
 			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
 				Server: server.Config{
 					Host: "localhost",
 					Port: 8080,
@@ -31,6 +36,9 @@ func TestNewConfig(t *testing.T) {
 		"valid config": {
 			configPath: "testdata/valid_config.yaml",
 			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelError,
+				},
 				Server: server.Config{
 					Host: "pomelo.com",
 					Port: 9898,
@@ -41,6 +49,9 @@ func TestNewConfig(t *testing.T) {
 		"missing host": {
 			configPath: "testdata/missing_host.yaml",
 			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
 				Server: server.Config{
 					Host: "localhost",
 					Port: 9876,
@@ -51,6 +62,9 @@ func TestNewConfig(t *testing.T) {
 		"missing port": {
 			configPath: "testdata/missing_port.yaml",
 			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
 				Server: server.Config{
 					Host: "pineapple.com",
 					Port: 8080,
@@ -63,6 +77,11 @@ func TestNewConfig(t *testing.T) {
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Server.Port' Error:" +
 				"Field validation for 'Port' failed on the 'min' tag",
+		},
+		"invalid log level": {
+			configPath:     "testdata/invalid_log_level.yaml",
+			expectedConfig: nil,
+			expectedError:  `loading configuration: parsing config file: slog: level string "BOGUS": unknown name`,
 		},
 		"invalid yaml": {
 			configPath:     "testdata/invalid_yaml.yaml",
@@ -100,6 +119,9 @@ func TestNewConfig(t *testing.T) {
 	t.Run("expands environment variables", func(t *testing.T) {
 		t.Setenv("FRIGG_HOST", "banana.com")
 		expectedConfig := &frigg.Config{
+			Log: log.Config{
+				Level: slog.LevelInfo,
+			},
 			Server: server.Config{
 				Host: "banana.com",
 				Port: 1111,
