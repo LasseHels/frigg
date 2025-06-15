@@ -1,0 +1,3 @@
+server:
+  host: ${FRIGG_HOST}
+  port: 1111

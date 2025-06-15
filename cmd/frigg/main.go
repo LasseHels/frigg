@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
 	"io"
 	"log/slog"
@@ -15,11 +16,13 @@ import (
 	"golang.org/x/sync/errgroup"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
-	"github.com/LasseHels/frigg/pkg/server"
 )
 
 // release is set through the linker at build time, generally from a git sha. Used for logging and error reporting.
 var release string
+
+// flagConfigFile is the flag that contains the path to Frigg's YAML configuration file.
+const flagConfigFile = "config.file"
 
 func main() {
 	os.Exit(start())
@@ -29,7 +32,11 @@ func start() int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	if err := run(ctx, os.Stdout); err != nil {
+	var configPath string
+	flag.StringVar(&configPath, flagConfigFile, "", "Path to Frigg's YAML configuration file (required)")
+	flag.Parse()
+
+	if err := run(ctx, configPath, os.Stdout); err != nil {
 		fmt.Println(err.Error())
 		return 1
 	}
@@ -37,19 +44,21 @@ func start() int {
 	return 0
 }
 
-func run(ctx context.Context, w io.Writer) error {
-	l := logger(w)
+func run(ctx context.Context, configPath string, w io.Writer) error {
+	if configPath == "" {
+		return errors.Errorf("required flag -%s missing", flagConfigFile)
+	}
+
 	registry := prometheus.NewRegistry()
 	registry.MustRegister(collectors.NewProcessCollector(collectors.ProcessCollectorOpts{}))
 	registry.MustRegister(collectors.NewGoCollector())
 
-	// TODO: Load configuration from file.
-	cfg := frigg.Config{
-		Server: server.Config{
-			Host: "localhost",
-			Port: 8080,
-		},
+	_, _ = fmt.Fprintf(w, "Loading configuration file from path %s\n", configPath)
+	cfg, err := frigg.NewConfig(configPath)
+	if err != nil {
+		return errors.Wrap(err, "reading configuration")
 	}
+	l := logger(w, cfg.Log.Level)
 
 	f := cfg.Initialise(l, registry)
 
@@ -80,9 +89,9 @@ func run(ctx context.Context, w io.Writer) error {
 	return nil
 }
 
-func logger(w io.Writer) *slog.Logger {
+func logger(w io.Writer, level slog.Level) *slog.Logger {
 	handler := slog.NewJSONHandler(w, &slog.HandlerOptions{
-		Level: slog.LevelInfo, // TODO: Read from configuration.
+		Level: level,
 	})
 	l := slog.New(handler)
 	l = l.With(slog.String("release", release))

@@ -29,7 +29,9 @@ func TestFriggIntegration(t *testing.T) {
 	release = "integration-test"
 
 	eg.Go(func() error {
-		return run(ctx, &out)
+		err := run(ctx, "testdata/integration_config.yaml", &out)
+		assert.NoError(t, err)
+		return err
 	})
 
 	serverURL := "http://localhost:8080"
@@ -47,6 +49,7 @@ func TestFriggIntegration(t *testing.T) {
 	})
 
 	logs := out.String()
+	assert.Contains(t, logs, "Loading configuration file from path testdata/integration_config.yaml\n")
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/health","methods":["GET"]`)
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/metrics","methods":["GET"]`)
 
