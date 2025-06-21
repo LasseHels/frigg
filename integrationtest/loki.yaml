@@ -1,0 +1,38 @@
+# See https://grafana.com/docs/loki/latest/configure/examples/#1-local-configuration-exampleyaml.
+auth_enabled: false
+
+query_scheduler:
+  # This configuration option is EXTREMELY important for the speed of our integration test suite.
+  #
+  # Loki cannot serve read queries before it has located its query schedulers. When use_scheduler_ring is set to true,
+  # Loki will use the scheduler ring to locate its schedulers. The issue is that the process that sweeps the ring for
+  # schedulers uses time.NewTicker() internally which doesn't tick immediately. The default sweep period is 10 seconds,
+  # which means that it takes a full 10 seconds before the first sweep happens, and thus also 10 seconds before Loki
+  # can serve reads. The sweep interval is configurable, and I played around with lowering it from 10 seconds with
+  # mixed results.
+  #
+  # A more straight-forward approach is to disable the scheduler ring entirely, which will force Loki to locate its
+  # schedulers via DNS. This process is near instantaneous, saving us several seconds every time Loki is booted in
+  # our test suite.
+  use_scheduler_ring: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+  replication_factor: 1
+  path_prefix: /tmp/loki
+
+schema_config:
+  configs:
+    - from: 2020-05-15
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
