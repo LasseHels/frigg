@@ -2,7 +2,6 @@ package loki_test
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -62,11 +61,11 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 
 	// Poll until logs are available or timeout is reached
 	var logs []loki.Log
-	assert.EventuallyWithT(t, func(t *assert.CollectT) {
+	assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 		var err error
-		logs, err = client.QueryRange(context.Background(), query, queryStart, queryEnd)
-		assert.NoError(t, err)
-		assert.Len(t, logs, 2, "Expected to get exactly 2 logs within the query range")
+		logs, err = client.QueryRange(t.Context(), query, queryStart, queryEnd)
+		assert.NoError(collect, err)
+		assert.Len(collect, logs, 2, "Expected to get exactly 2 logs within the query range")
 	}, 10*time.Second, 50*time.Millisecond, "Timed out waiting for logs to be queryable")
 
 	assert.Equal(t, "Second log entry in range", logs[0].Message())
