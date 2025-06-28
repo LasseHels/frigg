@@ -172,7 +172,7 @@ func TestClient_QueryRange(t *testing.T) {
 							"resultType": "streams",
 							"result": [
 								{
-									"stream": {"app": "test"},
+									"stream": {"app": "test", "env": "prod"},
 									"values": [
 										["1609459200000000000", "log message 1"],
 										["1609459201000000000", "log message 2"]
@@ -189,10 +189,14 @@ func TestClient_QueryRange(t *testing.T) {
 		logs, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
 		require.NoError(t, err)
 		assert.Len(t, logs, 2)
+
 		assert.Equal(t, "log message 1", logs[0].Message())
 		assert.Equal(t, time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC), logs[0].Timestamp())
+		assert.Equal(t, map[string]string{"app": "test", "env": "prod"}, logs[0].Stream())
+
 		assert.Equal(t, "log message 2", logs[1].Message())
 		assert.Equal(t, time.Date(2021, 1, 1, 0, 0, 1, 0, time.UTC), logs[1].Timestamp())
+		assert.Equal(t, map[string]string{"app": "test", "env": "prod"}, logs[1].Stream())
 	})
 }
 

@@ -39,7 +39,8 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 	})
 
 	now := time.Now().UTC()
-	inRange := now.Add(-30 * time.Minute)
+	firstTimestamp := now.Add(-30 * time.Minute)
+	secondTimestamp := now.Add(-40 * time.Minute)
 	beforeRange := now.Add(-2 * time.Hour)
 	queryStart := now.Add(-60 * time.Minute)
 	queryEnd := now
@@ -48,8 +49,8 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 
 	pushLogEntry(t, lokiContainer.Host(), beforeRange, "Log entry before query range", labels)
 
-	pushLogEntry(t, lokiContainer.Host(), inRange, "First log entry in range", labels)
-	pushLogEntry(t, lokiContainer.Host(), inRange, "Second log entry in range", labels)
+	pushLogEntry(t, lokiContainer.Host(), firstTimestamp, `traceID=123456 msg="First log in range"`, labels)
+	pushLogEntry(t, lokiContainer.Host(), secondTimestamp, "Second log entry in range", labels)
 
 	client := loki.NewClient(loki.ClientOptions{
 		Endpoint:   fmt.Sprintf("http://%s", lokiContainer.Host()),
@@ -57,7 +58,7 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 		Logger:     slog.Default(),
 	})
 
-	query := `{app="frigg-test",env="integration"}`
+	query := `{app="frigg-test",env="integration"} | logfmt`
 
 	// Poll until logs are available or timeout is reached
 	var logs []loki.Log
@@ -69,9 +70,21 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 	}, 10*time.Second, 50*time.Millisecond, "Timed out waiting for logs to be queryable")
 
 	assert.Equal(t, "Second log entry in range", logs[0].Message())
-	assert.Equal(t, "First log entry in range", logs[1].Message())
-	assert.Equal(t, inRange, logs[0].Timestamp())
-	assert.Equal(t, inRange, logs[1].Timestamp())
+	assert.Equal(t, `traceID=123456 msg="First log in range"`, logs[1].Message())
+	assert.Equal(t, secondTimestamp, logs[0].Timestamp())
+	assert.Equal(t, firstTimestamp, logs[1].Timestamp())
+
+	assert.Equal(t, map[string]string{"app": "frigg-test", "env": "integration"}, logs[0].Stream())
+	assert.Equal(
+		t,
+		map[string]string{
+			"app":     "frigg-test",
+			"env":     "integration",
+			"traceID": "123456",
+			"msg":     "First log in range",
+		},
+		logs[1].Stream(),
+	)
 }
 
 func pushLogEntry(t *testing.T, lokiAddress string, timestamp time.Time, message string, labels map[string]string) {
