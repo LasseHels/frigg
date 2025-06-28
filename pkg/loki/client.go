@@ -41,6 +41,7 @@ func NewClient(opts ClientOptions) *Client {
 type Log struct {
 	timestamp time.Time
 	message   string
+	stream    map[string]string
 }
 
 func (l *Log) Timestamp() time.Time {
@@ -49,6 +50,10 @@ func (l *Log) Timestamp() time.Time {
 
 func (l *Log) Message() string {
 	return l.message
+}
+
+func (l *Log) Stream() map[string]string {
+	return l.stream
 }
 
 // queryRangeResult represents a single stream result in the Loki query response.
@@ -116,8 +121,8 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 	}
 
 	var logs []Log
-	for _, stream := range response.Data.Result {
-		for _, value := range stream.Values {
+	for _, result := range response.Data.Result {
+		for _, value := range result.Values {
 			if len(value) != 2 {
 				return nil, fmt.Errorf("invalid value format in Loki response: %v", value)
 			}
@@ -133,6 +138,7 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 			logs = append(logs, Log{
 				timestamp: timestamp,
 				message:   message,
+				stream:    result.Stream,
 			})
 		}
 	}
