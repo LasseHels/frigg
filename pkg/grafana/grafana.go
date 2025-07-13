@@ -38,8 +38,10 @@ type UsedDashboardsOptions struct {
 	// IgnoredUsers whose reads do not count towards dashboard reads.
 	// A dashboard that is read exclusively by ignored users is considered unused.
 	//
+	// IgnoredUsers is case-sensitive.
+	//
 	// By default, no users are ignored.
-	IgnoredUsers []string // TODO: Case-sensitive?
+	IgnoredUsers []string
 	// ChunkSize used when querying logs. To avoid executing a single large query, Client chunks queries into smaller
 	// queries of this size. For example, if ChunkSize is two hours, Client splits a single 10-hour query into five
 	// smaller two-hour queries.
