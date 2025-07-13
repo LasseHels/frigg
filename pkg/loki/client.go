@@ -44,6 +44,14 @@ type Log struct {
 	stream    map[string]string
 }
 
+func NewLog(timestamp time.Time, message string, stream map[string]string) Log {
+	return Log{
+		timestamp: timestamp,
+		message:   message,
+		stream:    stream,
+	}
+}
+
 func (l *Log) Timestamp() time.Time {
 	return l.timestamp
 }
@@ -135,11 +143,8 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 			timestamp := time.Unix(0, nanoseconds).UTC()
 			message := value[1]
 
-			logs = append(logs, Log{
-				timestamp: timestamp,
-				message:   message,
-				stream:    result.Stream,
-			})
+			l := NewLog(timestamp, message, result.Stream)
+			logs = append(logs, l)
 		}
 	}
 
