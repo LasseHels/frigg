@@ -2,8 +2,12 @@ package grafana
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"sort"
 	"strings"
 	"time"
@@ -17,20 +21,35 @@ type client interface {
 	QueryRange(ctx context.Context, query string, start, end time.Time) ([]loki.Log, error)
 }
 
+type httpClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type Client struct {
-	logger *slog.Logger
-	client client
+	logger       *slog.Logger
+	client       client
+	httpClient   httpClient
+	grafanaURL   string
+	grafanaToken string
 }
 
 type NewClientOptions struct {
-	Logger *slog.Logger
-	Client client
+	Logger       *slog.Logger
+	Client       client
+	HTTPClient   httpClient
+	GrafanaURL   string
+	GrafanaToken string
 }
 
 func NewClient(opts NewClientOptions) *Client {
+	// TODO what if Grafana URL or token is empty?
+
 	return &Client{
-		logger: opts.Logger,
-		client: opts.Client,
+		logger:       opts.Logger,
+		client:       opts.Client,
+		httpClient:   opts.HTTPClient,
+		grafanaURL:   opts.GrafanaURL,
+		grafanaToken: opts.GrafanaToken,
 	}
 }
 
@@ -225,4 +244,93 @@ func (c *Client) UsedDashboards(
 	})
 
 	return result, nil
+}
+
+// Dashboard represents a Grafana dashboard from the search API response.
+type Dashboard struct {
+	ID      int       `json:"id"`
+	UID     string    `json:"uid"`
+	Title   string    `json:"title"`
+	URL     string    `json:"url"`
+	URI     string    `json:"uri"`
+	Type    string    `json:"type"`
+	Created time.Time `json:"created,omitempty"`
+	Updated time.Time `json:"updated,omitempty"`
+}
+
+// AllDashboards returns all dashboards from the Grafana instance.
+//
+// AllDashboards uses the Grafana HTTP API endpoint GET /api/search to search for dashboards.
+// See https://grafana.com/docs/grafana/v12.0/developers/http_api/folder_dashboard_search.
+//
+// AllDashboards handles pagination automatically and fetches all pages.
+func (c *Client) AllDashboards(ctx context.Context) ([]Dashboard, error) {
+	var allDashboards []Dashboard
+	page := 1
+	pageSize := 500
+
+	for {
+		dashboards, err := c.dashboardsPage(ctx, page, pageSize)
+		if err != nil {
+			return nil, errors.Wrap(err, "getting dashboards page")
+		}
+
+		if len(dashboards) == 0 {
+			break
+		}
+
+		allDashboards = append(allDashboards, dashboards...)
+
+		// If we got fewer results than the page size, we've reached the end.
+		if len(dashboards) < pageSize {
+			break
+		}
+
+		page++
+	}
+
+	return allDashboards, nil
+}
+
+// dashboardsPage fetches a single page of dashboard results from the Grafana API.
+func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dashboard, error) {
+	u, err := url.Parse(fmt.Sprintf("%s/api/search", strings.TrimSuffix(c.grafanaURL, "/")))
+	if err != nil {
+		return nil, errors.Wrap(err, "parsing Grafana URL")
+	}
+
+	q := u.Query()
+
+	q.Set("limit", fmt.Sprintf("%d", pageSize))
+	q.Set("page", fmt.Sprintf("%d", page))
+
+	u.RawQuery = q.Encode()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating request")
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.grafanaToken))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, errors.Wrap(err, "making request to Grafana")
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+	}
+
+	var dashboards []Dashboard
+	if err := json.NewDecoder(resp.Body).Decode(&dashboards); err != nil {
+		return nil, errors.Wrap(err, "decoding response")
+	}
+
+	return dashboards, nil
 }
