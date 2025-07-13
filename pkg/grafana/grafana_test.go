@@ -29,6 +29,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 	tests := map[string]struct {
 		mockLogs        []loki.Log
 		mockErr         error
+		chunkSize       time.Duration
 		lowerThreshold  int
 		labels          map[string]string
 		expectedErrText string
@@ -39,6 +40,21 @@ func TestClient_UsedDashboards(t *testing.T) {
 			lowerThreshold:  10,
 			labels:          map[string]string{},
 			expectedErrText: "labels must not be empty",
+		},
+		"negative chunk size": {
+			mockLogs:        nil,
+			mockErr:         nil,
+			chunkSize:       -1 * time.Hour,
+			lowerThreshold:  10,
+			labels:          map[string]string{"app": "grafana"},
+			expectedErrText: "invalid options: chunk size must be zero or greater, got -1h0m0s",
+		},
+		"negative lower threshold": {
+			mockLogs:        nil,
+			mockErr:         nil,
+			lowerThreshold:  -5,
+			labels:          map[string]string{"app": "grafana"},
+			expectedErrText: "invalid options: lower threshold must be zero or greater, got -5",
 		},
 		"client query error": {
 			mockLogs:        nil,
@@ -127,6 +143,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 
 			opts := grafana.UsedDashboardsOptions{
 				LowerThreshold: tc.lowerThreshold,
+				ChunkSize:      tc.chunkSize,
 			}
 
 			reads, err := g.UsedDashboards(t.Context(), tc.labels, time.Hour, opts)

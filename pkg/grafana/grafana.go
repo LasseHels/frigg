@@ -49,13 +49,26 @@ type UsedDashboardsOptions struct {
 	// Defaults to four hours.
 	ChunkSize time.Duration
 	// LowerThreshold under which the dashboard usage analysis is cancelled. If fewer than LowerThreshold logs are
-	// found in the given range, an error is returned. This option protects against malformed queries that return no
-	// logs and would erroneously consider no dashboards as being used.
+	// found in the given range, an error is returned.
 	//
-	// TODO: improve this comment.
+	// Since Grafana doesn't expose a formal API for dashboard usage, Frigg uses Grafana's logs as an API. This is
+	// dubious as Grafana makes no promise that the format of its logs will remain stable. If a Grafana update causes
+	// the format of logs upon which Frigg relies to change, then we'd prefer for Frigg to fail fast rather than
+	// erroneously consider all dashboards unused.
 	//
 	// Defaults to 10.
 	LowerThreshold int
+}
+
+// validate checks that the options are valid.
+func (o *UsedDashboardsOptions) validate() error {
+	if o.ChunkSize < 0 {
+		return fmt.Errorf("chunk size must be zero or greater, got %v", o.ChunkSize)
+	}
+	if o.LowerThreshold < 0 {
+		return fmt.Errorf("lower threshold must be zero or greater, got %d", o.LowerThreshold)
+	}
+	return nil
 }
 
 type DashboardReads struct {
@@ -91,7 +104,7 @@ func extractDashboardUID(path string) (string, error) {
 
 // UsedDashboards returns information about dashboard usage in range (now() - r) to now().
 //
-// A used dashboard is one that has been read by an un-ignored (see UsedDashboardsOptions.IgnoredUsers) user in the
+// A used dashboard is one that has been read by an un-ignored user (see UsedDashboardsOptions.IgnoredUsers) in the
 // given range.
 //
 // UsedDashboards errors if labels is empty.
@@ -108,10 +121,14 @@ func (c *Client) UsedDashboards(
 		return nil, errors.New("labels must not be empty")
 	}
 
-	if opts.ChunkSize <= 0 {
+	if err := opts.validate(); err != nil {
+		return nil, errors.Wrap(err, "invalid options")
+	}
+
+	if opts.ChunkSize == 0 {
 		opts.ChunkSize = 4 * time.Hour
 	}
-	if opts.LowerThreshold <= 0 {
+	if opts.LowerThreshold == 0 {
 		opts.LowerThreshold = 10
 	}
 
