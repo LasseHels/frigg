@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -360,10 +361,10 @@ func TestClient_AllDashboards(t *testing.T) {
 		defer server.Close()
 
 		g := grafana.NewClient(grafana.NewClientOptions{
-			Logger:       slog.Default(),
-			HTTPClient:   http.DefaultClient,
-			GrafanaURL:   server.URL,
-			GrafanaToken: "abc123",
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
 		})
 
 		dashboards, err := g.AllDashboards(t.Context())
@@ -382,10 +383,10 @@ func TestClient_AllDashboards(t *testing.T) {
 		defer server.Close()
 
 		g := grafana.NewClient(grafana.NewClientOptions{
-			Logger:       slog.Default(),
-			HTTPClient:   http.DefaultClient,
-			GrafanaURL:   server.URL,
-			GrafanaToken: "abc123",
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
 		})
 
 		dashboards, err := g.AllDashboards(t.Context())
@@ -403,10 +404,10 @@ func TestClient_AllDashboards(t *testing.T) {
 		defer server.Close()
 
 		g := grafana.NewClient(grafana.NewClientOptions{
-			Logger:       slog.Default(),
-			HTTPClient:   http.DefaultClient,
-			GrafanaURL:   server.URL,
-			GrafanaToken: "abc123",
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
 		})
 
 		dashboards, err := g.AllDashboards(t.Context())
@@ -452,10 +453,10 @@ func TestClient_AllDashboards(t *testing.T) {
 		defer server.Close()
 
 		g := grafana.NewClient(grafana.NewClientOptions{
-			Logger:       slog.Default(),
-			HTTPClient:   http.DefaultClient,
-			GrafanaURL:   server.URL,
-			GrafanaToken: "abc123",
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
 		})
 
 		dashboards, err := g.AllDashboards(t.Context())
@@ -464,4 +465,13 @@ func TestClient_AllDashboards(t *testing.T) {
 		assert.Equal(t, expectedDashboards, dashboards)
 		assert.Equal(t, 1, requestCount)
 	})
+}
+
+func mustParseURL(t *testing.T, input string) url.URL {
+	t.Helper()
+	parsed, err := url.Parse(input)
+	if err != nil {
+		require.NoError(t, err, "failed to parse URL: %s", input)
+	}
+	return *parsed
 }

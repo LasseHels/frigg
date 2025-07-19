@@ -26,30 +26,30 @@ type httpClient interface {
 }
 
 type Client struct {
-	logger       *slog.Logger
-	client       client
-	httpClient   httpClient
-	grafanaURL   string
-	grafanaToken string
+	logger     *slog.Logger
+	client     client
+	httpClient httpClient
+	endpoint   url.URL
+	token      string
 }
 
 type NewClientOptions struct {
-	Logger       *slog.Logger
-	Client       client
-	HTTPClient   httpClient
-	GrafanaURL   string
-	GrafanaToken string
+	Logger     *slog.Logger
+	Client     client
+	HTTPClient httpClient
+	Endpoint   url.URL // Endpoint where Grafana can be reached, e.g. "https://grafana.example.com".
+	Token      string  // Token used when authenticating with Grafana's HTTP API.
 }
 
 func NewClient(opts NewClientOptions) *Client {
 	// TODO what if Grafana URL or token is empty?
 
 	return &Client{
-		logger:       opts.Logger,
-		client:       opts.Client,
-		httpClient:   opts.HTTPClient,
-		grafanaURL:   opts.GrafanaURL,
-		grafanaToken: opts.GrafanaToken,
+		logger:     opts.Logger,
+		client:     opts.Client,
+		httpClient: opts.HTTPClient,
+		endpoint:   opts.Endpoint,
+		token:      opts.Token,
 	}
 }
 
@@ -294,10 +294,7 @@ func (c *Client) AllDashboards(ctx context.Context) ([]Dashboard, error) {
 
 // dashboardsPage fetches a single page of dashboard results from the Grafana API.
 func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dashboard, error) {
-	u, err := url.Parse(fmt.Sprintf("%s/api/search", strings.TrimSuffix(c.grafanaURL, "/")))
-	if err != nil {
-		return nil, errors.Wrap(err, "parsing Grafana URL")
-	}
+	u := c.endpoint.JoinPath("api", "search")
 
 	q := u.Query()
 
@@ -312,7 +309,7 @@ func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dash
 	}
 
 	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.grafanaToken))
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
