@@ -49,7 +49,7 @@ func (n *NewClientOptions) validate() error {
 	return nil
 }
 
-func NewClient(opts NewClientOptions) (*Client, error) {
+func NewClient(opts *NewClientOptions) (*Client, error) {
 	if err := opts.validate(); err != nil {
 		return nil, errors.Wrap(err, "validating Grafana client options")
 	}
@@ -65,7 +65,7 @@ func NewClient(opts NewClientOptions) (*Client, error) {
 
 type UsedDashboardsOptions struct {
 	// IgnoredUsers whose reads do not count towards dashboard reads.
-	// A dashboard that is read exclusively by ignored users is considered unused.
+	// A dashboard read exclusively by ignored users is considered unused.
 	//
 	// IgnoredUsers is case-sensitive.
 	//
@@ -79,7 +79,7 @@ type UsedDashboardsOptions struct {
 	//
 	// Defaults to four hours.
 	ChunkSize time.Duration
-	// LowerThreshold under which the dashboard usage analysis is cancelled. If fewer than LowerThreshold logs are
+	// LowerThreshold, under which the dashboard usage analysis is cancelled. If fewer than LowerThreshold logs are
 	// found in the given range, an error is returned.
 	//
 	// Since Grafana doesn't expose a formal API for dashboard usage, Frigg uses Grafana's logs as an API. This is
@@ -87,7 +87,7 @@ type UsedDashboardsOptions struct {
 	// the format of logs upon which Frigg relies to change, then we'd prefer for Frigg to fail fast rather than
 	// erroneously consider all dashboards unused.
 	//
-	// Defaults to 10.
+	// LowerThreshold defaults to 10.
 	LowerThreshold int
 }
 
@@ -135,7 +135,7 @@ func extractDashboardUID(path string) (string, error) {
 
 // UsedDashboards returns information about dashboard usage in range (now() - r) to now().
 //
-// A used dashboard is one that has been read by an un-ignored user (see UsedDashboardsOptions.IgnoredUsers) in the
+// A used dashboard is one that has been read by an unignored user (see UsedDashboardsOptions.IgnoredUsers) in the
 // given range.
 //
 // UsedDashboards errors if labels is empty.
@@ -330,7 +330,10 @@ func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dash
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			body = []byte(errors.Wrap(err, "could not read response body").Error())
+		}
 		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 

@@ -33,7 +33,7 @@ func TestNewClient(t *testing.T) {
 	t.Run("errors if token is empty", func(t *testing.T) {
 		t.Parallel()
 
-		_, err := grafana.NewClient(grafana.NewClientOptions{
+		_, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     nil,
 			Client:     nil,
 			HTTPClient: nil,
@@ -157,7 +157,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				err:  tc.mockErr,
 			}
 
-			g, err := grafana.NewClient(grafana.NewClientOptions{
+			g, err := grafana.NewClient(&grafana.NewClientOptions{
 				Logger: slog.Default(),
 				Client: client,
 				Token:  "banana",
@@ -218,7 +218,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
 			Token:  "apple",
@@ -285,7 +285,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
 			Token:  "pineapple",
@@ -335,7 +335,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err: nil,
 		}
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
 			Token:  "pomelo",
@@ -381,11 +381,12 @@ func TestClient_AllDashboards(t *testing.T) {
 			assert.Equal(t, "1", r.URL.Query().Get("page"))
 
 			w.WriteHeader(http.StatusInternalServerError)
-			_, _ = w.Write([]byte("the server is down"))
+			_, err := w.Write([]byte("the server is down"))
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
@@ -404,11 +405,12 @@ func TestClient_AllDashboards(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("[]"))
+			_, err := w.Write([]byte("[]"))
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
@@ -426,11 +428,12 @@ func TestClient_AllDashboards(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write([]byte("!!!"))
+			_, err := w.Write([]byte("!!!"))
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
@@ -476,11 +479,12 @@ func TestClient_AllDashboards(t *testing.T) {
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestCount++
 			w.WriteHeader(http.StatusOK)
-			_, _ = w.Write(dashboardsJSON)
+			_, err := w.Write(dashboardsJSON)
+			assert.NoError(t, err)
 		}))
 		defer server.Close()
 
-		g, err := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
