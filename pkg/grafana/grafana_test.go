@@ -2,8 +2,12 @@ package grafana_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -21,6 +25,23 @@ type mockClient struct {
 
 func (m *mockClient) QueryRange(_ context.Context, _ string, _, _ time.Time) ([]loki.Log, error) {
 	return m.logs, m.err
+}
+
+func TestNewClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("errors if token is empty", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     nil,
+			Client:     nil,
+			HTTPClient: nil,
+			Endpoint:   mustParseURL(t, "https://grafana.example.com"),
+			Token:      "",
+		})
+		require.EqualError(t, err, "validating Grafana client options: token must not be empty")
+	})
 }
 
 func TestClient_UsedDashboards(t *testing.T) {
@@ -136,10 +157,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 				err:  tc.mockErr,
 			}
 
-			g := grafana.NewClient(grafana.NewClientOptions{
+			g, err := grafana.NewClient(&grafana.NewClientOptions{
 				Logger: slog.Default(),
 				Client: client,
+				Token:  "banana",
 			})
+			require.NoError(t, err)
 
 			opts := grafana.UsedDashboardsOptions{
 				LowerThreshold: tc.lowerThreshold,
@@ -195,10 +218,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "apple",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -260,10 +285,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "pineapple",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -308,10 +335,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err: nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "pomelo",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -334,4 +363,148 @@ func TestClient_UsedDashboards(t *testing.T) {
 		assert.Equal(t, 5, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
 	})
+}
+
+func TestClient_AllDashboards(t *testing.T) {
+	t.Parallel()
+
+	t.Run("non-200 response", func(t *testing.T) {
+		t.Parallel()
+
+		requestCount := 0
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestCount++
+			assert.Equal(t, "/api/search", r.URL.Path)
+			assert.Equal(t, "Bearer abc123", r.Header.Get("Authorization"))
+			assert.Equal(t, "application/json", r.Header.Get("Accept"))
+			assert.Equal(t, "500", r.URL.Query().Get("limit"))
+			assert.Equal(t, "1", r.URL.Query().Get("page"))
+
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("the server is down"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		dashboards, err := g.AllDashboards(t.Context())
+		require.EqualError(t, err, "getting dashboards page: unexpected status code: 500, body: the server is down")
+		assert.Nil(t, dashboards)
+		assert.Equal(t, 1, requestCount)
+	})
+
+	t.Run("empty response", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("[]"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		dashboards, err := g.AllDashboards(t.Context())
+		require.NoError(t, err)
+		assert.Empty(t, dashboards)
+	})
+
+	t.Run("invalid json response", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("!!!"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		dashboards, err := g.AllDashboards(t.Context())
+		require.EqualError(
+			t,
+			err,
+			`getting dashboards page: decoding response: invalid character '!' looking for beginning of value`,
+		)
+		assert.Nil(t, dashboards)
+	})
+
+	t.Run("successful single page", func(t *testing.T) {
+		t.Parallel()
+
+		expectedDashboards := []grafana.Dashboard{
+			{
+				ID:    1,
+				UID:   "dashboard1",
+				Title: "Dashboard 1",
+				URL:   "/d/dashboard1/dashboard-1",
+				URI:   "db/dashboard-1",
+				Type:  "dash-db",
+			},
+			{
+				ID:    2,
+				UID:   "dashboard2",
+				Title: "Dashboard 2",
+				URL:   "/d/dashboard2/dashboard-2",
+				URI:   "db/dashboard-2",
+				Type:  "dash-db",
+			},
+		}
+
+		dashboardsJSON, err := json.Marshal(expectedDashboards)
+		require.NoError(t, err)
+
+		var requestCount int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestCount++
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write(dashboardsJSON)
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		dashboards, err := g.AllDashboards(t.Context())
+		require.NoError(t, err)
+		require.Len(t, dashboards, 2)
+		assert.Equal(t, expectedDashboards, dashboards)
+		assert.Equal(t, 1, requestCount)
+	})
+}
+
+func mustParseURL(t *testing.T, input string) url.URL {
+	t.Helper()
+	parsed, err := url.Parse(input)
+	if err != nil {
+		require.NoError(t, err, "failed to parse URL: %s", input)
+	}
+	return *parsed
 }
