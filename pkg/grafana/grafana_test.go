@@ -27,6 +27,23 @@ func (m *mockClient) QueryRange(_ context.Context, _ string, _, _ time.Time) ([]
 	return m.logs, m.err
 }
 
+func TestNewClient(t *testing.T) {
+	t.Parallel()
+
+	t.Run("errors if token is empty", func(t *testing.T) {
+		t.Parallel()
+
+		_, err := grafana.NewClient(grafana.NewClientOptions{
+			Logger:     nil,
+			Client:     nil,
+			HTTPClient: nil,
+			Endpoint:   mustParseURL(t, "https://grafana.example.com"),
+			Token:      "",
+		})
+		require.EqualError(t, err, "validating Grafana client options: token must not be empty")
+	})
+}
+
 func TestClient_UsedDashboards(t *testing.T) {
 	t.Parallel()
 
@@ -140,10 +157,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 				err:  tc.mockErr,
 			}
 
-			g := grafana.NewClient(grafana.NewClientOptions{
+			g, err := grafana.NewClient(grafana.NewClientOptions{
 				Logger: slog.Default(),
 				Client: client,
+				Token:  "banana",
 			})
+			require.NoError(t, err)
 
 			opts := grafana.UsedDashboardsOptions{
 				LowerThreshold: tc.lowerThreshold,
@@ -199,10 +218,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "apple",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -264,10 +285,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err:  nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "pineapple",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -312,10 +335,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 			err: nil,
 		}
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger: slog.Default(),
 			Client: client,
+			Token:  "pomelo",
 		})
+		require.NoError(t, err)
 
 		opts := grafana.UsedDashboardsOptions{
 			LowerThreshold: 1,
@@ -360,12 +385,13 @@ func TestClient_AllDashboards(t *testing.T) {
 		}))
 		defer server.Close()
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
 		})
+		require.NoError(t, err)
 
 		dashboards, err := g.AllDashboards(t.Context())
 		require.EqualError(t, err, "getting dashboards page: unexpected status code: 500, body: the server is down")
@@ -382,12 +408,13 @@ func TestClient_AllDashboards(t *testing.T) {
 		}))
 		defer server.Close()
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
 		})
+		require.NoError(t, err)
 
 		dashboards, err := g.AllDashboards(t.Context())
 		require.NoError(t, err)
@@ -403,12 +430,13 @@ func TestClient_AllDashboards(t *testing.T) {
 		}))
 		defer server.Close()
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
 		})
+		require.NoError(t, err)
 
 		dashboards, err := g.AllDashboards(t.Context())
 		require.EqualError(
@@ -452,12 +480,13 @@ func TestClient_AllDashboards(t *testing.T) {
 		}))
 		defer server.Close()
 
-		g := grafana.NewClient(grafana.NewClientOptions{
+		g, err := grafana.NewClient(grafana.NewClientOptions{
 			Logger:     slog.Default(),
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
 		})
+		require.NoError(t, err)
 
 		dashboards, err := g.AllDashboards(t.Context())
 		require.NoError(t, err)

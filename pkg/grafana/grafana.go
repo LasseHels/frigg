@@ -41,8 +41,18 @@ type NewClientOptions struct {
 	Token      string  // Token used when authenticating with Grafana's HTTP API.
 }
 
-func NewClient(opts NewClientOptions) *Client {
-	// TODO what if Grafana URL or token is empty?
+func (n *NewClientOptions) validate() error {
+	if n.Token == "" {
+		return errors.New("token must not be empty")
+	}
+
+	return nil
+}
+
+func NewClient(opts NewClientOptions) (*Client, error) {
+	if err := opts.validate(); err != nil {
+		return nil, errors.Wrap(err, "validating Grafana client options")
+	}
 
 	return &Client{
 		logger:     opts.Logger,
@@ -50,7 +60,7 @@ func NewClient(opts NewClientOptions) *Client {
 		httpClient: opts.HTTPClient,
 		endpoint:   opts.Endpoint,
 		token:      opts.Token,
-	}
+	}, nil
 }
 
 type UsedDashboardsOptions struct {
