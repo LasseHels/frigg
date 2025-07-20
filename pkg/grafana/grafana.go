@@ -383,8 +383,8 @@ type deleteDashboardResponse struct {
 
 // DeleteDashboard deletes a dashboard by its UID.
 //
-// DeleteDashboard uses the Grafana HTTP API endpoint DELETE /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid
-// to delete a dashboard in Grafana v12.
+// DeleteDashboard uses the Grafana HTTP API endpoint DELETE
+// /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid to delete a dashboard in Grafana v12.
 //
 // See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#delete-dashboard.
 func (c *Client) DeleteDashboard(ctx context.Context, uid string) error {
