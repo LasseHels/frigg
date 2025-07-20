@@ -2,7 +2,6 @@ package grafana_test
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -374,11 +373,10 @@ func TestClient_AllDashboards(t *testing.T) {
 		requestCount := 0
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestCount++
-			assert.Equal(t, "/api/search", r.URL.Path)
+			assert.Equal(t, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards", r.URL.Path)
 			assert.Equal(t, "Bearer abc123", r.Header.Get("Authorization"))
 			assert.Equal(t, "application/json", r.Header.Get("Accept"))
 			assert.Equal(t, "500", r.URL.Query().Get("limit"))
-			assert.Equal(t, "1", r.URL.Query().Get("page"))
 
 			w.WriteHeader(http.StatusInternalServerError)
 			_, err := w.Write([]byte("the server is down"))
@@ -398,29 +396,6 @@ func TestClient_AllDashboards(t *testing.T) {
 		require.EqualError(t, err, "getting dashboards page: unexpected status code: 500, body: the server is down")
 		assert.Nil(t, dashboards)
 		assert.Equal(t, 1, requestCount)
-	})
-
-	t.Run("empty response", func(t *testing.T) {
-		t.Parallel()
-
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-			_, err := w.Write([]byte("[]"))
-			assert.NoError(t, err)
-		}))
-		defer server.Close()
-
-		g, err := grafana.NewClient(&grafana.NewClientOptions{
-			Logger:     slog.Default(),
-			HTTPClient: http.DefaultClient,
-			Endpoint:   mustParseURL(t, server.URL),
-			Token:      "abc123",
-		})
-		require.NoError(t, err)
-
-		dashboards, err := g.AllDashboards(t.Context())
-		require.NoError(t, err)
-		assert.Empty(t, dashboards)
 	})
 
 	t.Run("invalid json response", func(t *testing.T) {
@@ -453,33 +428,79 @@ func TestClient_AllDashboards(t *testing.T) {
 	t.Run("successful single page", func(t *testing.T) {
 		t.Parallel()
 
-		expectedDashboards := []grafana.Dashboard{
-			{
-				ID:    1,
-				UID:   "dashboard1",
-				Title: "Dashboard 1",
-				URL:   "/d/dashboard1/dashboard-1",
-				URI:   "db/dashboard-1",
-				Type:  "dash-db",
-			},
-			{
-				ID:    2,
-				UID:   "dashboard2",
-				Title: "Dashboard 2",
-				URL:   "/d/dashboard2/dashboard-2",
-				URI:   "db/dashboard-2",
-				Type:  "dash-db",
-			},
-		}
+		now := time.Now()
+		formattedTime := now.Format(time.RFC3339)
 
-		dashboardsJSON, err := json.Marshal(expectedDashboards)
-		require.NoError(t, err)
+		rawJSON := `{
+			"kind": "DashboardList",
+			"apiVersion": "dashboard.grafana.app/v1beta1",
+			"metadata": {
+				"resourceVersion": "1741315830000",
+				"continue": ""
+			},
+			"items": [
+				{
+					"kind": "Dashboard",
+					"apiVersion": "dashboard.grafana.app/v1beta1",
+					"metadata": {
+						"name": "dashboard1",
+						"namespace": "default",
+						"uid": "VQyL7pNTpfGPNlPM6HRJSePrBg5dXmxr4iPQL7txLtwX",
+						"resourceVersion": "1",
+						"generation": 1,
+						"creationTimestamp": "` + formattedTime + `",
+						"labels": {
+							"grafana.app/deprecatedInternalID": "11"
+						},
+						"annotations": {
+							"grafana.app/createdBy": "service-account:dejwtrofg77y8d",
+							"grafana.app/folder": "fef30w4jaxla8b",
+							"grafana.app/updatedBy": "service-account:dejwtrofg77y8d",
+							"grafana.app/updatedTimestamp": "` + formattedTime + `"
+						}
+					},
+					"spec": {
+						"editable": true,
+						"fiscalYearStartMonth": 0,
+						"graphTooltip": 0,
+						"time": {
+							"from": "now-6h",
+							"to": "now"
+						},
+						"timepicker": {},
+						"timezone": "browser",
+						"title": "Dashboard 1"
+					}
+				},
+				{
+					"kind": "Dashboard",
+					"apiVersion": "dashboard.grafana.app/v1beta1",
+					"metadata": {
+						"name": "dashboard2",
+						"namespace": "default",
+						"uid": "uid2",
+						"resourceVersion": "2",
+						"generation": 2,
+						"creationTimestamp": "` + formattedTime + `",
+						"annotations": {
+							"grafana.app/createdBy": "service-account:cef2t2rfm73lsb",
+							"grafana.app/updatedBy": "service-account:cef2t2rfm73lsb",
+							"grafana.app/updatedTimestamp": "` + formattedTime + `"
+						}
+					},
+					"spec": {
+						"schemaVersion": 41,
+						"title": "Dashboard 2"
+					}
+				}
+			]
+		}`
 
 		var requestCount int
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			requestCount++
 			w.WriteHeader(http.StatusOK)
-			_, err := w.Write(dashboardsJSON)
+			_, err := w.Write([]byte(rawJSON))
 			assert.NoError(t, err)
 		}))
 		defer server.Close()
@@ -495,8 +516,123 @@ func TestClient_AllDashboards(t *testing.T) {
 		dashboards, err := g.AllDashboards(t.Context())
 		require.NoError(t, err)
 		require.Len(t, dashboards, 2)
-		assert.Equal(t, expectedDashboards, dashboards)
+
+		assert.Equal(t, "dashboard1", dashboards[0].Name)
+		assert.Equal(t, "default", dashboards[0].Namespace)
+		assert.Equal(t, "VQyL7pNTpfGPNlPM6HRJSePrBg5dXmxr4iPQL7txLtwX", dashboards[0].UID)
+		assert.Equal(t, formattedTime, dashboards[0].CreationTimestamp.Format(time.RFC3339))
+
+		assert.Equal(t, "dashboard2", dashboards[1].Name)
+		assert.Equal(t, "default", dashboards[1].Namespace)
+		assert.Equal(t, "uid2", dashboards[1].UID)
+		assert.Equal(t, formattedTime, dashboards[1].CreationTimestamp.Format(time.RFC3339))
+
 		assert.Equal(t, 1, requestCount)
+	})
+
+	t.Run("multiple pages", func(t *testing.T) {
+		t.Parallel()
+
+		now := time.Now()
+		formattedTime := now.Format(time.RFC3339)
+
+		firstPageJSON := `{
+			"kind": "DashboardList",
+			"apiVersion": "dashboard.grafana.app/v1beta1",
+			"metadata": {
+				"resourceVersion": "12345",
+				"continue": "next-page-token"
+			},
+			"items": [
+				{
+					"kind": "Dashboard",
+					"apiVersion": "dashboard.grafana.app/v1beta1",
+					"metadata": {
+						"name": "dashboard1",
+						"namespace": "default",
+						"uid": "uid1",
+						"resourceVersion": "1",
+						"generation": 1,
+						"creationTimestamp": "` + formattedTime + `",
+						"annotations": {
+							"grafana.app/createdBy": "service-account:cef2t2rfm73lsb"
+						}
+					},
+					"spec": {
+						"title": "Dashboard 1"
+					}
+				}
+			]
+		}`
+
+		secondPageJSON := `{
+			"kind": "DashboardList",
+			"apiVersion": "dashboard.grafana.app/v1beta1",
+			"metadata": {
+				"resourceVersion": "12345",
+				"continue": ""
+			},
+			"items": [
+				{
+					"kind": "Dashboard",
+					"apiVersion": "dashboard.grafana.app/v1beta1",
+					"metadata": {
+						"name": "dashboard2",
+						"namespace": "default",
+						"uid": "uid2",
+						"resourceVersion": "2",
+						"generation": 2,
+						"creationTimestamp": "` + formattedTime + `",
+						"annotations": {
+							"grafana.app/createdBy": "service-account:cef2t2rfm73lsb",
+							"grafana.app/updatedBy": "service-account:cef2t2rfm73lsb",
+							"grafana.app/updatedTimestamp": "` + formattedTime + `"
+						}
+					},
+					"spec": {
+						"title": "Dashboard 2"
+					}
+				}
+			]
+		}`
+
+		var requestCount int
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			requestCount++
+			continueToken := r.URL.Query().Get("continue")
+			responseBody := firstPageJSON
+
+			if continueToken == "next-page-token" {
+				responseBody = secondPageJSON
+			}
+
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(responseBody))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		dashboards, err := g.AllDashboards(t.Context())
+		require.NoError(t, err)
+		require.Len(t, dashboards, 2)
+
+		assert.Equal(t, "dashboard1", dashboards[0].Name)
+		assert.Equal(t, "default", dashboards[0].Namespace)
+		assert.Equal(t, "uid1", dashboards[0].UID)
+
+		assert.Equal(t, "dashboard2", dashboards[1].Name)
+		assert.Equal(t, "default", dashboards[1].Namespace)
+		assert.Equal(t, "uid2", dashboards[1].UID)
+
+		assert.Equal(t, 2, requestCount)
 	})
 }
 

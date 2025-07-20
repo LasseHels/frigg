@@ -256,66 +256,81 @@ func (c *Client) UsedDashboards(
 	return result, nil
 }
 
-// Dashboard represents a Grafana dashboard from the search API response.
 type Dashboard struct {
-	ID      int       `json:"id"`
-	UID     string    `json:"uid"`
-	Title   string    `json:"title"`
-	URL     string    `json:"url"`
-	URI     string    `json:"uri"`
-	Type    string    `json:"type"`
-	Created time.Time `json:"created,omitempty"`
-	Updated time.Time `json:"updated,omitempty"`
+	Name              string          `json:"name"`
+	Namespace         string          `json:"namespace"`
+	UID               string          `json:"uid"`
+	CreationTimestamp time.Time       `json:"creationTimestamp"`
+	Spec              json.RawMessage `json:"spec"`
+}
+
+type dashboardListResponse struct {
+	Metadata listMetadata    `json:"metadata"`
+	Items    []dashboardItem `json:"items"`
+}
+
+type listMetadata struct {
+	Continue string `json:"continue"`
+}
+
+type dashboardItem struct {
+	Kind       string                `json:"kind"`
+	APIVersion string                `json:"apiVersion"`
+	Metadata   dashboardItemMetadata `json:"metadata"`
+	Spec       json.RawMessage       `json:"spec"`
+}
+
+type dashboardItemMetadata struct {
+	Name              string    `json:"name"`
+	Namespace         string    `json:"namespace"`
+	UID               string    `json:"uid"`
+	CreationTimestamp time.Time `json:"creationTimestamp"`
 }
 
 // AllDashboards returns all dashboards from the Grafana instance.
 //
-// AllDashboards uses the Grafana HTTP API endpoint GET /api/search to search for dashboards.
-// See https://grafana.com/docs/grafana/v12.0/developers/http_api/folder_dashboard_search.
+// AllDashboards uses the Grafana HTTP API endpoint "List dashboards" to fetch all dashboards.
+// See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#list-dashboards.
 //
 // AllDashboards handles pagination automatically and fetches all pages.
 func (c *Client) AllDashboards(ctx context.Context) ([]Dashboard, error) {
 	var allDashboards []Dashboard
-	page := 1
 	pageSize := 500
+	continueToken := ""
 
 	for {
-		dashboards, err := c.dashboardsPage(ctx, page, pageSize)
+		dashboards, nextContinueToken, err := c.dashboardsPage(ctx, pageSize, continueToken)
 		if err != nil {
 			return nil, errors.Wrap(err, "getting dashboards page")
 		}
 
-		if len(dashboards) == 0 {
-			break
-		}
-
 		allDashboards = append(allDashboards, dashboards...)
 
-		// If we got fewer results than the page size, we've reached the end.
-		if len(dashboards) < pageSize {
+		if nextContinueToken == "" {
 			break
 		}
 
-		page++
+		continueToken = nextContinueToken
 	}
 
 	return allDashboards, nil
 }
 
 // dashboardsPage fetches a single page of dashboard results from the Grafana API.
-func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dashboard, error) {
-	u := c.endpoint.JoinPath("api", "search")
+func (c *Client) dashboardsPage(ctx context.Context, limit int, continueToken string) ([]Dashboard, string, error) {
+	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", "default", "dashboards")
 
 	q := u.Query()
-
-	q.Set("limit", fmt.Sprintf("%d", pageSize))
-	q.Set("page", fmt.Sprintf("%d", page))
+	q.Set("limit", fmt.Sprintf("%d", limit))
+	if continueToken != "" {
+		q.Set("continue", continueToken)
+	}
 
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating request")
+		return nil, "", errors.Wrap(err, "creating request")
 	}
 
 	req.Header.Set("Accept", "application/json")
@@ -323,7 +338,7 @@ func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dash
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "making request to Grafana")
+		return nil, "", errors.Wrap(err, "making request to Grafana")
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -334,13 +349,25 @@ func (c *Client) dashboardsPage(ctx context.Context, page, pageSize int) ([]Dash
 		if err != nil {
 			body = []byte(errors.Wrap(err, "could not read response body").Error())
 		}
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
-	var dashboards []Dashboard
-	if err := json.NewDecoder(resp.Body).Decode(&dashboards); err != nil {
-		return nil, errors.Wrap(err, "decoding response")
+	var response dashboardListResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, "", errors.Wrap(err, "decoding response")
 	}
 
-	return dashboards, nil
+	dashboards := make([]Dashboard, 0, len(response.Items))
+	for i := range response.Items {
+		item := &response.Items[i]
+		dashboards = append(dashboards, Dashboard{
+			Name:              item.Metadata.Name,
+			Namespace:         item.Metadata.Namespace,
+			UID:               item.Metadata.UID,
+			CreationTimestamp: item.Metadata.CreationTimestamp,
+			Spec:              item.Spec,
+		})
+	}
+
+	return dashboards, response.Metadata.Continue, nil
 }
