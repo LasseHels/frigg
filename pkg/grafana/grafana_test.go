@@ -643,6 +643,185 @@ func TestClient_AllDashboards(t *testing.T) {
 	})
 }
 
+func TestClient_DeleteDashboard(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty uid", func(t *testing.T) {
+		t.Parallel()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, "https://grafana.example.com"),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "")
+		require.EqualError(t, err, "dashboard UID must not be empty")
+	})
+
+	t.Run("server error", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, err := w.Write([]byte("server error"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		require.EqualError(t, err, "unexpected status code: 500, body: server error")
+	})
+
+	t.Run("invalid json response", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte("!!!"))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		require.EqualError(
+			t,
+			err,
+			`decoding response: invalid character '!' looking for beginning of value`,
+		)
+	})
+
+	t.Run("non-success status in response", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"metadata": {},
+				"status": "Failed",
+				"details": {
+					"name": "dashboard-uid",
+					"group": "dashboard.grafana.app",
+					"kind": "dashboards",
+					"uid": "dashboard-uid"
+				}
+			}`))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		require.EqualError(
+			t,
+			err,
+			"got response code 200 from dashboard delete request but response body claims failure, "+
+				"dashboard may have been deleted",
+		)
+	})
+
+	t.Run("successful deletion", func(t *testing.T) {
+		t.Parallel()
+		var request *http.Request
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			request = r
+
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{
+				"kind": "Status",
+				"apiVersion": "v1",
+				"metadata": {},
+				"status": "Success",
+				"details": {
+					"name": "dashboard-uid",
+					"group": "dashboard.grafana.app",
+					"kind": "dashboards",
+					"uid": "dashboard-uid"
+				}
+			}`))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		require.NoError(t, err)
+		assert.Equal(t, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard-uid", request.URL.Path)
+		assert.Equal(t, "Bearer abc123", request.Header.Get("Authorization"))
+		assert.Equal(t, "application/json", request.Header.Get("Accept"))
+		assert.Equal(t, "application/json", request.Header.Get("Content-Type"))
+		assert.Equal(t, http.MethodDelete, request.Method)
+	})
+
+	t.Run("http client error", func(t *testing.T) {
+		t.Parallel()
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// This should never be called as we're using a failing client.
+			assert.Fail(t, "Server should not be called")
+		}))
+		defer server.Close()
+
+		errorClient := &http.Client{
+			Transport: &errorTransport{},
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: errorClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		require.ErrorContains(t, err, "making request to Grafana")
+		require.ErrorContains(t, err, "simulated client error")
+	})
+}
+
+// errorTransport is an http.RoundTripper that always returns an error.
+type errorTransport struct{}
+
+func (e *errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	return nil, errors.New("simulated client error")
+}
+
 func mustParseURL(t *testing.T, input string) url.URL {
 	t.Helper()
 	parsed, err := url.Parse(input)
