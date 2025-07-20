@@ -38,7 +38,12 @@ type NewClientOptions struct {
 	Client     client
 	HTTPClient httpClient
 	Endpoint   url.URL // Endpoint where Grafana can be reached, e.g. "https://grafana.example.com".
-	Token      string  // Token used when authenticating with Grafana's HTTP API.
+	// Token used when authenticating with Grafana's HTTP API.
+	// Token is expected to have permissions to:
+	// - List dashboards in the Grafana instance. Frigg can only evaluate usage of dashboards that it can list.
+	//   Dashboards that Token cannot list are not evaluated.
+	// - Delete dashboards.
+	Token string
 }
 
 func (n *NewClientOptions) validate() error {
@@ -345,11 +350,11 @@ func (c *Client) dashboardsPage(ctx context.Context, limit int, continueToken st
 	}()
 
 	if resp.StatusCode != http.StatusOK {
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			body = []byte(errors.Wrap(err, "could not read response body").Error())
-		}
-		return nil, "", fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+		return nil, "", fmt.Errorf(
+			"unexpected status code: %d, body: %s",
+			resp.StatusCode,
+			readResponseBody(resp.Body),
+		)
 	}
 
 	var response dashboardListResponse
@@ -370,4 +375,67 @@ func (c *Client) dashboardsPage(ctx context.Context, limit int, continueToken st
 	}
 
 	return dashboards, response.Metadata.Continue, nil
+}
+
+type deleteDashboardResponse struct {
+	Status string `json:"status"`
+}
+
+// DeleteDashboard deletes a dashboard by its UID.
+//
+// DeleteDashboard uses the Grafana HTTP API endpoint DELETE /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid
+// to delete a dashboard in Grafana v12.
+//
+// See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#delete-dashboard.
+func (c *Client) DeleteDashboard(ctx context.Context, uid string) error {
+	if uid == "" {
+		return errors.New("dashboard UID must not be empty")
+	}
+
+	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", "default", "dashboards", uid)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), http.NoBody)
+	if err != nil {
+		return errors.Wrap(err, "creating request")
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.token))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return errors.Wrap(err, "making request to Grafana")
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, readResponseBody(resp.Body))
+	}
+
+	var response deleteDashboardResponse
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return errors.Wrap(err, "decoding response")
+	}
+
+	if response.Status != "Success" {
+		return fmt.Errorf(
+			"got response code %d from dashboard delete request but response body claims failure, "+
+				"dashboard may have been deleted",
+			http.StatusOK,
+		)
+	}
+
+	return nil
+}
+
+func readResponseBody(r io.Reader) string {
+	body, err := io.ReadAll(r)
+	if err != nil {
+		body = []byte(errors.Wrap(err, "could not read response body").Error())
+	}
+
+	return string(body)
 }
