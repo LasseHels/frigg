@@ -521,11 +521,18 @@ func TestClient_AllDashboards(t *testing.T) {
 		assert.Equal(t, "default", dashboards[0].Namespace)
 		assert.Equal(t, "VQyL7pNTpfGPNlPM6HRJSePrBg5dXmxr4iPQL7txLtwX", dashboards[0].UID)
 		assert.Equal(t, formattedTime, dashboards[0].CreationTimestamp.Format(time.RFC3339))
+		assert.JSONEq(
+			t,
+			`{"editable": true,"fiscalYearStartMonth": 0,"graphTooltip": 0,"time": {"from":`+
+				` "now-6h","to": "now"},"timepicker": {},"timezone": "browser","title": "Dashboard 1"}`,
+			string(dashboards[0].Spec),
+		)
 
 		assert.Equal(t, "dashboard2", dashboards[1].Name)
 		assert.Equal(t, "default", dashboards[1].Namespace)
 		assert.Equal(t, "uid2", dashboards[1].UID)
 		assert.Equal(t, formattedTime, dashboards[1].CreationTimestamp.Format(time.RFC3339))
+		assert.JSONEq(t, `{"schemaVersion": 41,"title": "Dashboard 2"}`, string(dashboards[1].Spec))
 
 		assert.Equal(t, 1, requestCount)
 	})
