@@ -83,7 +83,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		usedDashboardsCalled := 0
 		mockClient := &mockGrafanaClient{
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
-				return []Dashboard{}, nil
+				return nil, nil
 			},
 			usedDashboards: func(
 				_ context.Context,
