@@ -33,7 +33,7 @@ grafana:
     # The value of endpoint must be a valid URL according to Go's url.Parse() function.
     #
     # Required.
-	endpoint: 'https://grafana.example.com'
+    endpoint: 'https://grafana.example.com'
 ```
 
 ### Environment Variable Expansion
