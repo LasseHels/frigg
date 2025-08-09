@@ -51,7 +51,7 @@ type NewDashboardPrunerOptions struct {
 	Dry bool
 }
 
-func NewDashboardPruner(opts NewDashboardPrunerOptions) *DashboardPruner {
+func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 	logger := opts.Logger.With(slog.Bool("dry", opts.Dry))
 
 	return &DashboardPruner{
