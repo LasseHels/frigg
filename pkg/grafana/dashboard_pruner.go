@@ -27,6 +27,7 @@ type DashboardPruner struct {
 	ignoredUsers []string
 	period       time.Duration
 	labels       map[string]string
+	dry          bool
 }
 
 type NewDashboardPrunerOptions struct {
@@ -45,16 +46,22 @@ type NewDashboardPrunerOptions struct {
 	// Labels with which to identify log lines emitted by Grafana.
 	// See also Client.UsedDashboards.
 	Labels map[string]string
+	// Dry determines whether to actually delete dashboards.
+	// If true, DashboardPruner will only log which dashboards would be deleted instead of actually deleting them.
+	Dry bool
 }
 
-func NewDashboardPruner(opts NewDashboardPrunerOptions) *DashboardPruner {
+func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
+	logger := opts.Logger.With(slog.Bool("dry", opts.Dry))
+
 	return &DashboardPruner{
 		grafana:      opts.Grafana,
-		logger:       opts.Logger,
+		logger:       logger,
 		interval:     opts.Interval,
 		ignoredUsers: opts.IgnoredUsers,
 		period:       opts.Period,
 		labels:       opts.Labels,
+		dry:          opts.Dry,
 	}
 }
 
@@ -114,6 +121,11 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 				slog.Int("users", usage.Users()),
 				slog.String("range", d.period.String()),
 			)
+			continue
+		}
+
+		if d.dry {
+			dashboardLogger.Info("Found unused dashboard, skipping deletion due to dry run")
 			continue
 		}
 

@@ -57,7 +57,7 @@ func TestDashboardPruner_Start(t *testing.T) {
 
 		l, logs := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:  mockClient,
 			Logger:   l,
 			Interval: time.Hour,
@@ -65,10 +65,11 @@ func TestDashboardPruner_Start(t *testing.T) {
 
 		pruner.Start(ctx)
 
-		expectedLogs := `{"level":"INFO","msg":"Starting dashboard pruner","interval":"1h0m0s"}
-{"level":"INFO","msg":"Pruning Grafana dashboards"}
-{"level":"ERROR","msg":"Failed to prune dashboards","error":"fetching all Grafana dashboards: could not reach Grafana"}
-{"level":"INFO","msg":"Stopping dashboard pruner"}
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Starting dashboard pruner","dry":false,"interval":"1h0m0s"}
+{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
+{"level":"ERROR","msg":"Failed to prune dashboards","dry":false,"error":"fetching all Grafana dashboards: could not reach Grafana"}
+{"level":"INFO","msg":"Stopping dashboard pruner","dry":false}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -101,7 +102,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, logs := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -114,10 +115,10 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, 1, usedDashboardsCalled)
 
-		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards"}
-{"level":"INFO","msg":"Found all Grafana dashboards","count":0}
-{"level":"INFO","msg":"Found used Grafana dashboards","count":0}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","deleted_count":0,"uids":""}
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":0}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":0}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"uids":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -155,7 +156,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, logs := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -168,12 +169,12 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		require.NoError(t, err)
 
 		//nolint:lll
-		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards"}
-{"level":"INFO","msg":"Found all Grafana dashboards","count":2}
-{"level":"INFO","msg":"Found used Grafana dashboards","count":2}
-{"level":"DEBUG","msg":"Skipping used dashboard","uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
-{"level":"DEBUG","msg":"Skipping used dashboard","uid":"dashboard2","name":"Dashboard 2","reads":5,"users":1,"range":"24h0m0s"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","deleted_count":0,"uids":""}
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":2}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","reads":5,"users":1,"range":"24h0m0s"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"uids":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -221,7 +222,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, logs := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -235,15 +236,78 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		assert.ElementsMatch(t, []string{"dashboard2", "dashboard3"}, deletedUIDs)
 
 		//nolint:lll
-		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards"}
-{"level":"INFO","msg":"Found all Grafana dashboards","count":3}
-{"level":"INFO","msg":"Found used Grafana dashboards","count":1}
-{"level":"DEBUG","msg":"Skipping used dashboard","uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
-{"level":"INFO","msg":"Deleting unused dashboard","uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
-{"level":"INFO","msg":"Deleted unused dashboard","uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
-{"level":"INFO","msg":"Deleting unused dashboard","uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
-{"level":"INFO","msg":"Deleted unused dashboard","uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","deleted_count":2,"uids":"dashboard2, dashboard3"}
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":3}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":1}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":2,"uids":"dashboard2, dashboard3"}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
+
+	t.Run("does not delete unused dashboards in dry mode", func(t *testing.T) {
+		t.Parallel()
+
+		deleteDashboardCalled := false
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:  "dashboard1",
+						Name: "Dashboard 1",
+						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+					},
+					{
+						UID:  "dashboard2",
+						Name: "Dashboard 2",
+						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return []DashboardReads{
+					newMockDashboardReads("dashboard1", 10, 2),
+				}, nil
+			},
+			deleteDashboard: func(_ context.Context, uid string) error {
+				deleteDashboardCalled = true
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Interval:     time.Hour,
+			IgnoredUsers: []string{"admin"},
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+			Dry:          true,
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.False(t, deleteDashboardCalled, "deleteDashboard should not be called in dry mode")
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":true}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":true,"count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":true,"count":1}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":true,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"dashboard2","name":"Dashboard 2"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":true,"deleted_count":0,"uids":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -259,7 +323,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, _ := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -297,7 +361,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, _ := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -343,7 +407,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		l, logs := logger()
 
-		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
 			Grafana:      mockClient,
 			Logger:       l,
 			Interval:     time.Hour,
@@ -356,10 +420,10 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		require.EqualError(t, err, "deleting unused dashboard dashboard1: dashboard delete failed")
 
 		//nolint:lll
-		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards"}
-{"level":"INFO","msg":"Found all Grafana dashboards","count":2}
-{"level":"INFO","msg":"Found used Grafana dashboards","count":0}
-{"level":"INFO","msg":"Deleting unused dashboard","uid":"dashboard1","name":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":0}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
