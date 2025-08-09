@@ -248,6 +248,69 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		assert.Equal(t, expectedLogs, logs.String())
 	})
 
+	t.Run("does not delete unused dashboards in dry mode", func(t *testing.T) {
+		t.Parallel()
+
+		deleteDashboardCalled := false
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:  "dashboard1",
+						Name: "Dashboard 1",
+						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+					},
+					{
+						UID:  "dashboard2",
+						Name: "Dashboard 2",
+						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return []DashboardReads{
+					newMockDashboardReads("dashboard1", 10, 2),
+				}, nil
+			},
+			deleteDashboard: func(_ context.Context, uid string) error {
+				deleteDashboardCalled = true
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Interval:     time.Hour,
+			IgnoredUsers: []string{"admin"},
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+			Dry:          true,
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.False(t, deleteDashboardCalled, "deleteDashboard should not be called in dry mode")
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":true}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":true,"count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":true,"count":1}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":true,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"dashboard2","name":"Dashboard 2"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":true,"deleted_count":0,"uids":""}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
+
 	t.Run("error fetching all dashboards", func(t *testing.T) {
 		t.Parallel()
 
