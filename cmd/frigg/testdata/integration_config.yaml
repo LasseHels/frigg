@@ -1,1 +1,2 @@
-
+grafana:
+  endpoint: 'https://grafana.example.com'

@@ -1,2 +1,4 @@
 server:
   host: pineapple.com
+grafana:
+  endpoint: 'http://example.com'
