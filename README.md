@@ -25,14 +25,14 @@ server:
   port: 8080
 
 grafana:
-	# Endpoint where Grafana can be reached. This endpoint is used to read and delete dashboards via Grafana's API.
-	# Frigg automatically appends API path elements to this endpoint and expects the value of the configuration option
-	# to be the base URL of the Grafana instance. In other words, pass 'https://grafana.example.com' instead of
-	# 'https://grafana.example.com/apis'.
-	#
-	# The value of endpoint must be a valid URL according to Go's url.Parse() function.
-	#
-	# Required.
+    # Endpoint where Grafana can be reached. This endpoint is used to read and delete dashboards via Grafana's API.
+    # Frigg automatically appends API path elements to this endpoint and expects the value of the configuration option
+    # to be the base URL of the Grafana instance. In other words, pass 'https://grafana.example.com' instead of
+    # 'https://grafana.example.com/apis'.
+    #
+    # The value of endpoint must be a valid URL according to Go's url.Parse() function.
+    #
+    # Required.
 	endpoint: 'https://grafana.example.com'
 ```
 
