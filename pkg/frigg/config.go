@@ -11,13 +11,15 @@ import (
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 
+	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
 type Config struct {
-	Log    log.Config    `yaml:"log"`
-	Server server.Config `yaml:"server"`
+	Log     log.Config     `yaml:"log"`
+	Server  server.Config  `yaml:"server"`
+	Grafana grafana.Config `yaml:"grafana" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.

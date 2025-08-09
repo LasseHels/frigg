@@ -1,2 +1,4 @@
 log:
   level: BOGUS
+grafana:
+  endpoint: 'http://example.com'

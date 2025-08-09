@@ -1,0 +1,2 @@
+grafana:
+  endpoint: 'not-a-valid-url'

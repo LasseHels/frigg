@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
+	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
 	"github.com/LasseHels/frigg/pkg/server"
 )
@@ -21,17 +22,10 @@ func TestNewConfig(t *testing.T) {
 
 	tests := map[string]testCase{
 		"empty config file": {
-			configPath: "testdata/empty_config.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelInfo,
-				},
-				Server: server.Config{
-					Host: "localhost",
-					Port: 8080,
-				},
-			},
-			expectedError: "",
+			configPath:     "testdata/empty_config.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 		"valid config": {
 			configPath: "testdata/valid_config.yaml",
@@ -42,6 +36,9 @@ func TestNewConfig(t *testing.T) {
 				Server: server.Config{
 					Host: "pomelo.com",
 					Port: 9898,
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
 				},
 			},
 			expectedError: "",
@@ -56,6 +53,9 @@ func TestNewConfig(t *testing.T) {
 					Host: "localhost",
 					Port: 9876,
 				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
 			},
 			expectedError: "",
 		},
@@ -68,6 +68,9 @@ func TestNewConfig(t *testing.T) {
 				Server: server.Config{
 					Host: "pineapple.com",
 					Port: 8080,
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
 				},
 			},
 			expectedError: "",
@@ -99,6 +102,18 @@ func TestNewConfig(t *testing.T) {
 			expectedError: `loading configuration: reading config file at path "testdata/nonexistent.yaml":` +
 				` open testdata/nonexistent.yaml: no such file or directory`,
 		},
+		"missing grafana endpoint": {
+			configPath:     "testdata/missing_grafana_endpoint.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag",
+		},
+		"invalid grafana endpoint url": {
+			configPath:     "testdata/invalid_grafana_endpoint.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'url' tag",
+		},
 	}
 
 	for name, tt := range tests {
@@ -125,6 +140,9 @@ func TestNewConfig(t *testing.T) {
 			Server: server.Config{
 				Host: "banana.com",
 				Port: 1111,
+			},
+			Grafana: grafana.Config{
+				Endpoint: "http://example.com",
 			},
 		}
 
