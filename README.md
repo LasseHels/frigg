@@ -40,8 +40,6 @@ grafana:
 
 ### Secrets File Structure
 
-Currently, the secrets file is used to store the Grafana API token:
-
 ```yaml
 grafana:
     # Token used to authenticate with Grafana's API.
@@ -62,3 +60,5 @@ server:
 ```
 
 If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the server host.
+
+**Note:** The secrets file does not support environment variable expansion for security reasons.

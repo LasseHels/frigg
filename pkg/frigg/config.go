@@ -105,9 +105,6 @@ func (c *Config) validate() error {
 
 // validate ensures the secrets configuration is valid.
 func (s *Secrets) validate() error {
-	if s == nil {
-		return errors.New("secrets configuration is required")
-	}
 	return validate(s)
 }
 
