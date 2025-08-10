@@ -154,9 +154,9 @@ func TestNewConfig(t *testing.T) {
 
 func TestNewSecrets(t *testing.T) {
 	type testCase struct {
-		secretsPath    string
+		secretsPath     string
 		expectedSecrets *frigg.Secrets
-		expectedError  string
+		expectedError   string
 	}
 
 	tests := map[string]testCase{
@@ -172,17 +172,18 @@ func TestNewSecrets(t *testing.T) {
 		"missing secrets file": {
 			secretsPath:     "testdata/nonexistent_secrets.yaml",
 			expectedSecrets: nil,
-			expectedError: `reading secrets file at path "testdata/nonexistent_secrets.yaml": open testdata/nonexistent_secrets.yaml: no such file or directory`,
+			expectedError: `reading secrets file at path "testdata/nonexistent_secrets.yaml": ` +
+				`open testdata/nonexistent_secrets.yaml: no such file or directory`,
 		},
 		"empty secrets file": {
 			secretsPath:     "testdata/empty_secrets.yaml",
 			expectedSecrets: nil,
-			expectedError:  "parsing secrets file: EOF",
+			expectedError:   "parsing secrets file: EOF",
 		},
 		"invalid secrets yaml": {
 			secretsPath:     "testdata/invalid_secrets.yaml",
 			expectedSecrets: nil,
-			expectedError:  "parsing secrets file: yaml: line 2: mapping values are not allowed in this context",
+			expectedError:   "parsing secrets file: yaml: line 2: mapping values are not allowed in this context",
 		},
 		"missing grafana token in secrets": {
 			secretsPath:     "testdata/missing_grafana_secrets.yaml",

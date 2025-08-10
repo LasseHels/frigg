@@ -46,6 +46,7 @@ Currently, the secrets file is used to store the Grafana API token:
 grafana:
     # Token used to authenticate with Grafana's API.
     # This token must have permissions to list and delete dashboards.
+    #
     # Required.
     token: 'your-grafana-api-token-here'
 ```

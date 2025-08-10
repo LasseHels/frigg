@@ -49,20 +49,18 @@ func NewSecrets(path string) (*Secrets, error) {
 		return nil, errors.Wrapf(err, "reading secrets file at path %q", path)
 	}
 
-	buf = []byte(os.ExpandEnv(string(buf)))
-
-	var secrets Secrets
+	var secrets *Secrets
 	dec := yaml.NewDecoder(bytes.NewReader(buf))
 
 	if err := dec.Decode(&secrets); err != nil {
 		return nil, errors.Wrap(err, "parsing secrets file")
 	}
 
-	if err := validateSecrets(&secrets); err != nil {
+	if err := secrets.validate(); err != nil {
 		return nil, errors.Wrap(err, "validating secrets")
 	}
 
-	return &secrets, nil
+	return secrets, nil
 }
 
 // defaults sets default values for the Config.
@@ -102,33 +100,22 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer) *
 
 // validate ensures the configuration is valid.
 func (c *Config) validate() error {
-	v := validator.New()
-
-	if err := v.Struct(c); err != nil {
-		var errs []error
-		var valErrs validator.ValidationErrors
-
-		if errors.As(err, &valErrs) {
-			for _, e := range valErrs {
-				errs = append(errs, e)
-			}
-		}
-
-		return multierr.Combine(errs...)
-	}
-
-	return nil
+	return validate(c)
 }
 
-// validateSecrets ensures the secrets configuration is valid.
-func validateSecrets(secrets *Secrets) error {
-	if secrets == nil {
+// validate ensures the secrets configuration is valid.
+func (s *Secrets) validate() error {
+	if s == nil {
 		return errors.New("secrets configuration is required")
 	}
+	return validate(s)
+}
 
+// validate performs validation on any struct using the validator package.
+func validate(s any) error {
 	v := validator.New()
 
-	if err := v.Struct(secrets); err != nil {
+	if err := v.Struct(s); err != nil {
 		var errs []error
 		var valErrs validator.ValidationErrors
 
