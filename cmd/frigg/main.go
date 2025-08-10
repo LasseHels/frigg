@@ -62,11 +62,17 @@ func run(ctx context.Context, configPath, secretsPath string, w io.Writer) error
 	registry.MustRegister(collectors.NewGoCollector())
 
 	_, _ = fmt.Fprintf(w, "Loading configuration file from path %s\n", configPath)
-	_, _ = fmt.Fprintf(w, "Loading secrets file from path %s\n", secretsPath)
-	cfg, err := frigg.NewConfigWithSecrets(configPath, secretsPath)
+	cfg, err := frigg.NewConfig(configPath)
 	if err != nil {
 		return errors.Wrap(err, "reading configuration")
 	}
+
+	_, _ = fmt.Fprintf(w, "Loading secrets file from path %s\n", secretsPath)
+	secrets, err := frigg.NewSecrets(secretsPath)
+	if err != nil {
+		return errors.Wrap(err, "reading secrets")
+	}
+	_ = secrets // TODO: Use secrets when implementing Grafana client
 	l := logger(w, cfg.Log.Level)
 
 	f := cfg.Initialise(l, registry)

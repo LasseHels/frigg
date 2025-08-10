@@ -40,7 +40,7 @@ grafana:
 
 ### Secrets File Structure
 
-The secrets file contains sensitive information that should not be stored in the main configuration file. Currently, the secrets file is used to store the Grafana API token:
+Currently, the secrets file is used to store the Grafana API token:
 
 ```yaml
 grafana:
@@ -49,14 +49,6 @@ grafana:
     # Required.
     token: 'your-grafana-api-token-here'
 ```
-
-The secrets file must:
-- Exist and be readable by Frigg
-- Contain valid YAML
-- Include the `grafana.token` field
-- Have a non-empty value for `grafana.token`
-
-Frigg will fail to start if any of these requirements are not met.
 
 ### Environment Variable Expansion
 

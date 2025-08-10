@@ -26,7 +26,7 @@ func TestRun(t *testing.T) {
 	t.Run("errors if secrets path is missing", func(t *testing.T) {
 		t.Parallel()
 
-		err := run(ctx, "../../pkg/frigg/testdata/valid_config.yaml", "", io.Discard)
+		err := run(ctx, "testdata/valid_config.yaml", "", io.Discard)
 		expectedErr := "required flag -secrets.file missing"
 		require.EqualError(t, err, expectedErr)
 	})
@@ -43,8 +43,8 @@ func TestRun(t *testing.T) {
 	t.Run("errors if secrets path points to invalid file", func(t *testing.T) {
 		t.Parallel()
 
-		err := run(ctx, "../../pkg/frigg/testdata/valid_config.yaml", "does/not/exist", io.Discard)
-		expectedErr := `reading configuration: loading secrets: reading secrets file at path "does/not/exist":` +
+		err := run(ctx, "testdata/valid_config.yaml", "does/not/exist", io.Discard)
+		expectedErr := `reading secrets: reading secrets file at path "does/not/exist":` +
 			` open does/not/exist: no such file or directory`
 		require.EqualError(t, err, expectedErr)
 	})

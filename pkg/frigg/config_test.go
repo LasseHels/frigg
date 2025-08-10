@@ -152,76 +152,49 @@ func TestNewConfig(t *testing.T) {
 	})
 }
 
-func TestNewConfigWithSecrets(t *testing.T) {
+func TestNewSecrets(t *testing.T) {
 	type testCase struct {
-		configPath     string
 		secretsPath    string
-		expectedConfig *frigg.Config
+		expectedSecrets *frigg.Secrets
 		expectedError  string
 	}
 
 	tests := map[string]testCase{
-		"valid config and secrets": {
-			configPath:  "testdata/valid_config.yaml",
+		"valid secrets": {
 			secretsPath: "testdata/valid_secrets.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelError,
-				},
-				Server: server.Config{
-					Host: "pomelo.com",
-					Port: 9898,
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
+			expectedSecrets: &frigg.Secrets{
+				Grafana: grafana.Secrets{
+					Token: "example-valid-token",
 				},
 			},
 			expectedError: "",
 		},
 		"missing secrets file": {
-			configPath:     "testdata/valid_config.yaml",
-			secretsPath:    "testdata/nonexistent_secrets.yaml",
-			expectedConfig: nil,
-			expectedError: `loading secrets: reading secrets file at path "testdata/nonexistent_secrets.yaml": open testdata/nonexistent_secrets.yaml: no such file or directory`,
+			secretsPath:     "testdata/nonexistent_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: `reading secrets file at path "testdata/nonexistent_secrets.yaml": open testdata/nonexistent_secrets.yaml: no such file or directory`,
 		},
 		"empty secrets file": {
-			configPath:     "testdata/valid_config.yaml",
-			secretsPath:    "testdata/empty_secrets.yaml",
-			expectedConfig: nil,
-			expectedError:  "loading secrets: parsing secrets file: EOF",
+			secretsPath:     "testdata/empty_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError:  "parsing secrets file: EOF",
 		},
 		"invalid secrets yaml": {
-			configPath:     "testdata/valid_config.yaml",
-			secretsPath:    "testdata/invalid_secrets.yaml",
-			expectedConfig: nil,
-			expectedError:  "loading secrets: parsing secrets file: yaml: line 2: mapping values are not allowed in this context",
+			secretsPath:     "testdata/invalid_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError:  "parsing secrets file: yaml: line 2: mapping values are not allowed in this context",
 		},
 		"missing grafana token in secrets": {
-			configPath:     "testdata/valid_config.yaml",
-			secretsPath:    "testdata/missing_grafana_secrets.yaml",
-			expectedConfig: nil,
-			expectedError: "validating secrets: Key: 'SecretsConfig.Grafana.Token' Error:" +
+			secretsPath:     "testdata/missing_grafana_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
 				"Field validation for 'Token' failed on the 'required' tag",
 		},
 		"empty grafana token in secrets": {
-			configPath:     "testdata/valid_config.yaml",
-			secretsPath:    "testdata/empty_token_secrets.yaml",
-			expectedConfig: nil,
-			expectedError: "validating secrets: Key: 'SecretsConfig.Grafana.Token' Error:" +
+			secretsPath:     "testdata/empty_token_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
 				"Field validation for 'Token' failed on the 'required' tag",
-		},
-		"missing config file": {
-			configPath:     "testdata/nonexistent.yaml",
-			secretsPath:    "testdata/valid_secrets.yaml",
-			expectedConfig: nil,
-			expectedError: `loading configuration: reading config file at path "testdata/nonexistent.yaml": open testdata/nonexistent.yaml: no such file or directory`,
-		},
-		"invalid config file": {
-			configPath:     "testdata/empty_config.yaml",
-			secretsPath:    "testdata/valid_secrets.yaml",
-			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 	}
 
@@ -229,38 +202,15 @@ func TestNewConfigWithSecrets(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			cfg, err := frigg.NewConfigWithSecrets(tt.configPath, tt.secretsPath)
+			secrets, err := frigg.NewSecrets(tt.secretsPath)
 
 			if tt.expectedError != "" {
 				require.EqualError(t, err, tt.expectedError, name)
-				assert.Nil(t, cfg, name)
+				assert.Nil(t, secrets, name)
 			} else {
 				require.NoError(t, err, name)
-				assert.NotNil(t, cfg, name)
-				// We can't directly compare the Config since it contains unexported secrets field
-				// So we compare the public fields individually
-				assert.Equal(t, tt.expectedConfig.Log, cfg.Log)
-				assert.Equal(t, tt.expectedConfig.Server, cfg.Server)
-				assert.Equal(t, tt.expectedConfig.Grafana, cfg.Grafana)
+				assert.Equal(t, tt.expectedSecrets, secrets, name)
 			}
 		})
 	}
-}
-
-func TestConfig_GrafanaToken(t *testing.T) {
-	t.Run("returns token when secrets are loaded", func(t *testing.T) {
-		cfg, err := frigg.NewConfigWithSecrets("testdata/valid_config.yaml", "testdata/valid_secrets.yaml")
-		require.NoError(t, err)
-		
-		token := cfg.GrafanaToken()
-		assert.Equal(t, "example-valid-token", token)
-	})
-
-	t.Run("returns empty string when no secrets", func(t *testing.T) {
-		cfg, err := frigg.NewConfig("testdata/valid_config.yaml")
-		require.NoError(t, err)
-		
-		token := cfg.GrafanaToken()
-		assert.Equal(t, "", token)
-	})
 }

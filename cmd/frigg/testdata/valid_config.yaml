@@ -1,0 +1,9 @@
+server:
+  host: pomelo.com
+  port: 9898
+
+log:
+  level: ERROR
+
+grafana:
+  endpoint: 'http://example.com'
