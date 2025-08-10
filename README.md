@@ -34,7 +34,46 @@ grafana:
     #
     # Required.
     endpoint: 'https://grafana.example.com'
+
+prune:
+  # If dry is set to true, the dashboard pruner will only log unused dashboards instead of deleting them (default: true).
+  dry: true
+  # The interval with which the dashboard pruner will search for unused dashboards.
+  # Regardless of the value of interval, the dashboard pruner will always run once immediately after Frigg has started.
+  # This value must be a valid Go duration string (default: "10m").
+  interval: '10m'
+  # Ignored users whose reads do not count toward the usage of a dashboard. This option can be used to ignore reads
+  # from service accounts that regularly read many or all dashboards.
+  # Ignored users values are case-sensitive (default: []).
+  ignored_users:
+    - 'some-admin'
+    - 'a-service-account'
+  # The period of time in the past to include reads. For example, when setting period to '30d', only reads from the last
+  # 30 days will count towards dashboard usage. IMPORTANT: Frigg does not take into account the retention period of
+  # logs in Loki. Setting period to an amount greater than Loki's retention period will not cause an error and is
+  # discouraged.
+  #
+  # This value must be a valid Go duration string.
+  #
+  # Required.
+  period: '60d'
+  # Labels that identify Grafana logs in Loki. For example, if labels are set to app: 'grafana' and env: 'production',
+  # then Frigg will query Grafana logs in Loki with the selector {app="grafana", env="production"}.
+  #
+  # Required.
+  labels:
+    app: 'grafana'
+    env: 'production'
 ```
+
+### Prune Configuration
+
+The `prune` section is optional but when configured, it enables automatic pruning of unused Grafana dashboards. When any prune configuration field is set, the following fields become required:
+
+- `period`: Time period to look back for dashboard usage
+- `labels`: Loki labels to identify Grafana logs
+
+Duration values support standard Go duration formats (e.g., `5m`, `1h`) as well as days format (e.g., `30d` for 30 days).
 
 ### Environment Variable Expansion
 

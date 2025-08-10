@@ -3,6 +3,7 @@ package frigg_test
 import (
 	"log/slog"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -10,6 +11,7 @@ import (
 	"github.com/LasseHels/frigg/pkg/frigg"
 	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
+	"github.com/LasseHels/frigg/pkg/prune"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -40,6 +42,10 @@ func TestNewConfig(t *testing.T) {
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
+				Prune: prune.Config{
+					Dry:      true,
+					Interval: prune.Duration(10 * time.Minute),
+				},
 			},
 			expectedError: "",
 		},
@@ -56,6 +62,10 @@ func TestNewConfig(t *testing.T) {
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
+				Prune: prune.Config{
+					Dry:      true,
+					Interval: prune.Duration(10 * time.Minute),
+				},
 			},
 			expectedError: "",
 		},
@@ -71,6 +81,10 @@ func TestNewConfig(t *testing.T) {
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
+				},
+				Prune: prune.Config{
+					Dry:      true,
+					Interval: prune.Duration(10 * time.Minute),
 				},
 			},
 			expectedError: "",
@@ -114,6 +128,52 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'url' tag",
 		},
+		"valid prune config": {
+			configPath: "testdata/valid_prune_config.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "test.com",
+					Port: 8080,
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: prune.Config{
+					Dry:          false,
+					Interval:     prune.Duration(5 * time.Minute),
+					IgnoredUsers: []string{"admin"},
+					Period:       prune.Duration(30 * 24 * time.Hour),
+					Labels: map[string]string{
+						"app": "grafana",
+						"env": "test",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"missing prune period": {
+			configPath:     "testdata/missing_prune_period.yaml",
+			expectedConfig: nil,
+			expectedError:  "validating configuration: validating prune configuration: prune.period is required when prune configuration is used",
+		},
+		"missing prune labels": {
+			configPath:     "testdata/missing_prune_labels.yaml",
+			expectedConfig: nil,
+			expectedError:  "validating configuration: validating prune configuration: prune.labels is required when prune configuration is used",
+		},
+		"invalid prune interval": {
+			configPath:     "testdata/invalid_prune_interval.yaml",
+			expectedConfig: nil,
+			expectedError:  `loading configuration: parsing config file: invalid duration "invalid-duration": time: invalid duration "invalid-duration"`,
+		},
+		"invalid prune period": {
+			configPath:     "testdata/invalid_prune_period.yaml",
+			expectedConfig: nil,
+			expectedError:  `loading configuration: parsing config file: invalid duration "invalid-duration": time: invalid duration "invalid-duration"`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -143,6 +203,10 @@ func TestNewConfig(t *testing.T) {
 			},
 			Grafana: grafana.Config{
 				Endpoint: "http://example.com",
+			},
+			Prune: prune.Config{
+				Dry:      true,
+				Interval: prune.Duration(10 * time.Minute),
 			},
 		}
 

@@ -1,0 +1,15 @@
+server:
+  host: test.com
+  port: 8080
+
+grafana:
+  endpoint: 'http://example.com'
+
+prune:
+  dry: false
+  interval: '5m'
+  ignored_users:
+    - 'admin'
+  labels:
+    app: 'grafana'
+    env: 'test'
