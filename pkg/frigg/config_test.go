@@ -151,3 +151,67 @@ func TestNewConfig(t *testing.T) {
 		assert.Equal(t, expectedConfig, cfg)
 	})
 }
+
+func TestNewSecrets(t *testing.T) {
+	type testCase struct {
+		secretsPath     string
+		expectedSecrets *frigg.Secrets
+		expectedError   string
+	}
+
+	tests := map[string]testCase{
+		"valid secrets": {
+			secretsPath: "testdata/valid_secrets.yaml",
+			expectedSecrets: &frigg.Secrets{
+				Grafana: grafana.Secrets{
+					Token: "example-valid-token",
+				},
+			},
+			expectedError: "",
+		},
+		"missing secrets file": {
+			secretsPath:     "testdata/nonexistent_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: `reading secrets file at path "testdata/nonexistent_secrets.yaml": ` +
+				`open testdata/nonexistent_secrets.yaml: no such file or directory`,
+		},
+		"empty secrets file": {
+			secretsPath:     "testdata/empty_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError:   "parsing secrets file: EOF",
+		},
+		"invalid secrets yaml": {
+			secretsPath:     "testdata/invalid_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError:   "parsing secrets file: yaml: line 2: mapping values are not allowed in this context",
+		},
+		"missing grafana token in secrets": {
+			secretsPath:     "testdata/missing_grafana_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
+				"Field validation for 'Token' failed on the 'required' tag",
+		},
+		"empty grafana token in secrets": {
+			secretsPath:     "testdata/empty_token_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
+				"Field validation for 'Token' failed on the 'required' tag",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			secrets, err := frigg.NewSecrets(tt.secretsPath)
+
+			if tt.expectedError != "" {
+				require.EqualError(t, err, tt.expectedError, name)
+				assert.Nil(t, secrets, name)
+			} else {
+				require.NoError(t, err, name)
+				assert.Equal(t, tt.expectedSecrets, secrets, name)
+			}
+		})
+	}
+}

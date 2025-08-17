@@ -18,16 +18,33 @@ func TestRun(t *testing.T) {
 	t.Run("errors if config path is missing", func(t *testing.T) {
 		t.Parallel()
 
-		err := run(ctx, "", io.Discard)
+		err := run(ctx, "", "testdata/valid_secrets.yaml", io.Discard)
 		expectedErr := "required flag -config.file missing"
+		require.EqualError(t, err, expectedErr)
+	})
+
+	t.Run("errors if secrets path is missing", func(t *testing.T) {
+		t.Parallel()
+
+		err := run(ctx, "testdata/valid_config.yaml", "", io.Discard)
+		expectedErr := "required flag -secrets.file missing"
 		require.EqualError(t, err, expectedErr)
 	})
 
 	t.Run("errors if config path points to invalid file", func(t *testing.T) {
 		t.Parallel()
 
-		err := run(ctx, "does/not/exist", io.Discard)
+		err := run(ctx, "does/not/exist", "testdata/valid_secrets.yaml", io.Discard)
 		expectedErr := `reading configuration: loading configuration: reading config file at path "does/not/exist":` +
+			` open does/not/exist: no such file or directory`
+		require.EqualError(t, err, expectedErr)
+	})
+
+	t.Run("errors if secrets path points to invalid file", func(t *testing.T) {
+		t.Parallel()
+
+		err := run(ctx, "testdata/valid_config.yaml", "does/not/exist", io.Discard)
+		expectedErr := `reading secrets: reading secrets file at path "does/not/exist":` +
 			` open does/not/exist: no such file or directory`
 		require.EqualError(t, err, expectedErr)
 	})

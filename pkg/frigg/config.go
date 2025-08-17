@@ -16,6 +16,10 @@ import (
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
+type Secrets struct {
+	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
+}
+
 type Config struct {
 	Log     log.Config     `yaml:"log"`
 	Server  server.Config  `yaml:"server"`
@@ -36,6 +40,27 @@ func NewConfig(path string) (*Config, error) {
 	}
 
 	return c, nil
+}
+
+// NewSecrets creates a new Secrets from the given path.
+func NewSecrets(path string) (*Secrets, error) {
+	buf, err := os.ReadFile(path)
+	if err != nil {
+		return nil, errors.Wrapf(err, "reading secrets file at path %q", path)
+	}
+
+	var secrets *Secrets
+	dec := yaml.NewDecoder(bytes.NewReader(buf))
+
+	if err := dec.Decode(&secrets); err != nil {
+		return nil, errors.Wrap(err, "parsing secrets file")
+	}
+
+	if err := secrets.validate(); err != nil {
+		return nil, errors.Wrap(err, "validating secrets")
+	}
+
+	return secrets, nil
 }
 
 // defaults sets default values for the Config.
@@ -75,9 +100,19 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer) *
 
 // validate ensures the configuration is valid.
 func (c *Config) validate() error {
+	return validate(c)
+}
+
+// validate ensures the secrets configuration is valid.
+func (s *Secrets) validate() error {
+	return validate(s)
+}
+
+// validate performs validation on any struct using the validator package.
+func validate(s any) error {
 	v := validator.New()
 
-	if err := v.Struct(c); err != nil {
+	if err := v.Struct(s); err != nil {
 		var errs []error
 		var valErrs validator.ValidationErrors
 
