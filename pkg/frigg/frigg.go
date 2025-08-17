@@ -1,13 +1,16 @@
 package frigg
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"golang.org/x/sync/errgroup"
 
 	"github.com/LasseHels/frigg/pkg/frigg/handlers"
+	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -15,23 +18,43 @@ type Frigg struct {
 	logger   *slog.Logger
 	server   *server.Server
 	gatherer prometheus.Gatherer
+	pruner   *grafana.DashboardPruner
 }
 
-func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer) *Frigg {
+func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pruner *grafana.DashboardPruner) *Frigg {
 	return &Frigg{
 		logger:   logger,
 		server:   s,
 		gatherer: gatherer,
+		pruner:   pruner,
 	}
 }
 
 // Start Frigg. Start blocks until Stop is called.
-func (f *Frigg) Start() error {
+func (f *Frigg) Start(ctx context.Context) error {
 	f.logger.Info("Starting Frigg")
 
 	f.registerRoutes()
 
-	return f.server.Start()
+	eg, ctx := errgroup.WithContext(ctx)
+
+	// Start the dashboard pruner
+	eg.Go(func() error {
+		f.pruner.Start(ctx)
+		return nil
+	})
+
+	// Start the server
+	eg.Go(func() error {
+		return f.server.Start()
+	})
+
+	// Wait for context to be done or any goroutine to return an error
+	if err := eg.Wait(); err != nil {
+		return errors.Wrap(err, "starting components")
+	}
+
+	return nil
 }
 
 func (f *Frigg) Stop() error {

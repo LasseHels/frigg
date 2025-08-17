@@ -9,6 +9,17 @@ server:
   # The port number to listen on (default: 8080).
   port: 8080
 
+loki:
+  # Endpoint where Loki can be reached. This endpoint is used to query Grafana logs for dashboard usage analysis.
+  # Frigg automatically appends API path elements to this endpoint and expects the value of the configuration option
+  # to be the base URL of the Loki instance. In other words, pass 'https://loki.example.com' instead of
+  # 'https://loki.example.com/loki/api/v1'.
+  #
+  # The value of endpoint must be a valid URL according to Go's url.Parse() function.
+  #
+  # Required.
+  endpoint: 'https://loki.example.com'
+
 grafana:
     # Endpoint where Grafana can be reached. This endpoint is used to read and delete dashboards via Grafana's API.
     # Frigg automatically appends API path elements to this endpoint and expects the value of the configuration option

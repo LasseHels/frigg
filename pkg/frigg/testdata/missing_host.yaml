@@ -1,5 +1,7 @@
 server:
   port: 9876
+loki:
+  endpoint: 'http://loki.example.com'
 grafana:
   endpoint: 'http://example.com'
 

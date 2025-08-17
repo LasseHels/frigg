@@ -1,6 +1,8 @@
 server:
   host: localhost
   port: -1
+loki:
+  endpoint: 'http://loki.example.com'
 grafana:
   endpoint: 'http://example.com'
 

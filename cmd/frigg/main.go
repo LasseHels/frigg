@@ -72,15 +72,14 @@ func run(ctx context.Context, configPath, secretsPath string, w io.Writer) error
 	if err != nil {
 		return errors.Wrap(err, "reading secrets")
 	}
-	_ = secrets // TODO: Use secrets when implementing Grafana client
 	l := logger(w, cfg.Log.Level)
 
-	f := cfg.Initialise(l, registry)
+	f := cfg.Initialise(l, registry, secrets)
 
 	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
-		if err := f.Start(); err != nil {
+		if err := f.Start(ctx); err != nil {
 			return errors.Wrap(err, "starting Frigg")
 		}
 

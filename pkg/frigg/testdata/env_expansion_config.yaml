@@ -1,6 +1,8 @@
 server:
   host: ${FRIGG_HOST}
   port: 1111
+loki:
+  endpoint: 'http://loki.example.com'
 grafana:
   endpoint: 'http://example.com'
 
