@@ -7,3 +7,13 @@ log:
 
 grafana:
   endpoint: 'http://example.com'
+
+prune:
+  dry: false
+  interval: '5m'
+  ignored_users:
+    - 'admin'
+  period: '720h'
+  labels:
+    app: 'grafana'
+    env: 'test'

@@ -66,15 +66,6 @@ prune:
     env: 'production'
 ```
 
-### Prune Configuration
-
-The `prune` section is optional but when configured, it enables automatic pruning of unused Grafana dashboards. When any prune configuration field is set, the following fields become required:
-
-- `period`: Time period to look back for dashboard usage
-- `labels`: Loki labels to identify Grafana logs
-
-Duration values support standard Go duration formats (e.g., `5m`, `1h`) as well as days format (e.g., `30d` for 30 days).
-
 ### Environment Variable Expansion
 
 Frigg's YAML configuration supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) in the configuration file.

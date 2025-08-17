@@ -11,7 +11,6 @@ import (
 	"github.com/LasseHels/frigg/pkg/frigg"
 	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
-	"github.com/LasseHels/frigg/pkg/prune"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -27,7 +26,9 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/empty_config.yaml",
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag",
+				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
+				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
+				"Field validation for 'Labels' failed on the 'required' tag",
 		},
 		"valid config": {
 			configPath: "testdata/valid_config.yaml",
@@ -42,9 +43,15 @@ func TestNewConfig(t *testing.T) {
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
-				Prune: prune.Config{
-					Dry:      true,
-					Interval: prune.Duration(10 * time.Minute),
+				Prune: grafana.PruneConfig{
+					Dry:          false,
+					Interval:     5 * time.Minute,
+					IgnoredUsers: []string{"admin"},
+					Period:       720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+						"env": "test",
+					},
 				},
 			},
 			expectedError: "",
@@ -62,9 +69,13 @@ func TestNewConfig(t *testing.T) {
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
-				Prune: prune.Config{
+				Prune: grafana.PruneConfig{
 					Dry:      true,
-					Interval: prune.Duration(10 * time.Minute),
+					Interval: 10 * time.Minute,
+					Period:   720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+					},
 				},
 			},
 			expectedError: "",
@@ -82,9 +93,13 @@ func TestNewConfig(t *testing.T) {
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
-				Prune: prune.Config{
+				Prune: grafana.PruneConfig{
 					Dry:      true,
-					Interval: prune.Duration(10 * time.Minute),
+					Interval: 10 * time.Minute,
+					Period:   720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+					},
 				},
 			},
 			expectedError: "",
@@ -120,7 +135,9 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/missing_grafana_endpoint.yaml",
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag",
+				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
+				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
+				"Field validation for 'Labels' failed on the 'required' tag",
 		},
 		"invalid grafana endpoint url": {
 			configPath:     "testdata/invalid_grafana_endpoint.yaml",
@@ -128,51 +145,27 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'url' tag",
 		},
-		"valid prune config": {
-			configPath: "testdata/valid_prune_config.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelInfo,
-				},
-				Server: server.Config{
-					Host: "test.com",
-					Port: 8080,
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
-				},
-				Prune: prune.Config{
-					Dry:          false,
-					Interval:     prune.Duration(5 * time.Minute),
-					IgnoredUsers: []string{"admin"},
-					Period:       prune.Duration(30 * 24 * time.Hour),
-					Labels: map[string]string{
-						"app": "grafana",
-						"env": "test",
-					},
-				},
-			},
-			expectedError: "",
-		},
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
 			expectedConfig: nil,
-			expectedError:  "validating configuration: validating prune configuration: prune.period is required when prune configuration is used",
+			expectedError:  "validating configuration: Key: 'Config.Prune.Period' Error:Field validation for 'Period' failed on the 'required' tag",
 		},
 		"missing prune labels": {
 			configPath:     "testdata/missing_prune_labels.yaml",
 			expectedConfig: nil,
-			expectedError:  "validating configuration: validating prune configuration: prune.labels is required when prune configuration is used",
+			expectedError:  "validating configuration: Key: 'Config.Prune.Labels' Error:Field validation for 'Labels' failed on the 'required' tag",
 		},
 		"invalid prune interval": {
 			configPath:     "testdata/invalid_prune_interval.yaml",
 			expectedConfig: nil,
-			expectedError:  `loading configuration: parsing config file: invalid duration "invalid-duration": time: invalid duration "invalid-duration"`,
+			expectedError:  `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
+				`  line 10: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune period": {
 			configPath:     "testdata/invalid_prune_period.yaml",
 			expectedConfig: nil,
-			expectedError:  `loading configuration: parsing config file: invalid duration "invalid-duration": time: invalid duration "invalid-duration"`,
+			expectedError:  `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
+				`  line 13: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 	}
 
@@ -204,9 +197,13 @@ func TestNewConfig(t *testing.T) {
 			Grafana: grafana.Config{
 				Endpoint: "http://example.com",
 			},
-			Prune: prune.Config{
+			Prune: grafana.PruneConfig{
 				Dry:      true,
-				Interval: prune.Duration(10 * time.Minute),
+				Interval: 10 * time.Minute,
+				Period:   720 * time.Hour,
+				Labels: map[string]string{
+					"app": "grafana",
+				},
 			},
 		}
 

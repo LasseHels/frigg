@@ -10,7 +10,7 @@ prune:
   interval: 'invalid-duration'
   ignored_users:
     - 'admin'
-  period: '30d'
+  period: '720h'
   labels:
     app: 'grafana'
     env: 'test'

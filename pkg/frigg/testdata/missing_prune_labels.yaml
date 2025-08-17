@@ -10,4 +10,4 @@ prune:
   interval: '5m'
   ignored_users:
     - 'admin'
-  period: '30d'
+  period: '720h'
