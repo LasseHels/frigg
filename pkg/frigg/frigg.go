@@ -30,7 +30,7 @@ func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pr
 	}
 }
 
-// Start Frigg. Start blocks until Stop is called.
+// Start Frigg. Start blocks until the context is cancelled.
 func (f *Frigg) Start(ctx context.Context) error {
 	f.logger.Info("Starting Frigg")
 
@@ -49,7 +49,13 @@ func (f *Frigg) Start(ctx context.Context) error {
 		return f.server.Start()
 	})
 
-	// Wait for context to be done or any goroutine to return an error
+	// Wait for context cancellation then stop components
+	eg.Go(func() error {
+		<-ctx.Done()
+		return f.server.Stop()
+	})
+
+	// Wait for all goroutines to complete
 	if err := eg.Wait(); err != nil {
 		return errors.Wrap(err, "starting components")
 	}

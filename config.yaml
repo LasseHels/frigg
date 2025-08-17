@@ -52,7 +52,7 @@ prune:
   # This value must be a valid Go duration string.
   #
   # Required.
-  period: '60d'
+  period: '1440h'
   # Labels that identify Grafana logs in Loki. For example, if labels are set to app: 'grafana' and env: 'production',
   # then Frigg will query Grafana logs in Loki with the selector {app="grafana", env="production"}.
   #
