@@ -9,6 +9,7 @@
 - NEVER name things as "improved" or "new" or "enhanced", etc. Code naming should be evergreen. What is new today will be "old" someday.
 - Always pin versions. Avoid the use of `latest` tags.
 - Use British English when writing in a natural language.
+- ALWAYS run linting and tests before committing code.
 
 # Testing
 
