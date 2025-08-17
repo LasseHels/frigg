@@ -13,3 +13,7 @@ type PruneConfig struct {
 	Period       time.Duration     `yaml:"period" validate:"required"`
 	Labels       map[string]string `yaml:"labels" validate:"required"`
 }
+
+type Secrets struct {
+	Token string `yaml:"token" validate:"required"`
+}

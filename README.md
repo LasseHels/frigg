@@ -4,12 +4,14 @@ Frigg analyses Grafana dashboard usage and deletes unused dashboards
 
 ## Configuration
 
-Frigg is configured using a YAML configuration file. The path to this file is provided using the `-config.file` flag when starting Frigg:
+Frigg is configured using a YAML configuration file and a YAML secrets file. The paths to these files are provided using the `-config.file` and `-secrets.file` flags when starting Frigg:
 ```bash
-frigg -config.file=/path/to/config.yaml
+frigg -config.file=/path/to/config.yaml -secrets.file=/path/to/secrets.yaml
 ```
 
-### Structure
+Both flags are required. Frigg will fail to start if either flag is missing or points to a non-existent file.
+
+### Configuration File Structure
 
 Below is a complete example of Frigg's configuration file structure:
 ```yaml
@@ -66,6 +68,17 @@ prune:
     env: 'production'
 ```
 
+### Secrets File Structure
+
+```yaml
+grafana:
+    # Token used to authenticate with Grafana's API.
+    # This token must have permissions to list and delete dashboards.
+    #
+    # Required.
+    token: 'your-grafana-api-token-here'
+```
+
 ### Environment Variable Expansion
 
 Frigg's YAML configuration supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) in the configuration file.
@@ -77,3 +90,6 @@ server:
 ```
 
 If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the server host.
+
+> [!NOTE]
+> The secrets file does not support environment variable expansion for security reasons.

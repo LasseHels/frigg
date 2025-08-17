@@ -24,6 +24,9 @@ var release string
 // flagConfigFile is the flag that contains the path to Frigg's YAML configuration file.
 const flagConfigFile = "config.file"
 
+// flagSecretsFile is the flag that contains the path to Frigg's YAML secrets file.
+const flagSecretsFile = "secrets.file"
+
 func main() {
 	os.Exit(start())
 }
@@ -32,11 +35,12 @@ func start() int {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	var configPath string
+	var configPath, secretsPath string
 	flag.StringVar(&configPath, flagConfigFile, "", "Path to Frigg's YAML configuration file (required)")
+	flag.StringVar(&secretsPath, flagSecretsFile, "", "Path to Frigg's YAML secrets file (required)")
 	flag.Parse()
 
-	if err := run(ctx, configPath, os.Stdout); err != nil {
+	if err := run(ctx, configPath, secretsPath, os.Stdout); err != nil {
 		fmt.Println(err.Error())
 		return 1
 	}
@@ -44,9 +48,13 @@ func start() int {
 	return 0
 }
 
-func run(ctx context.Context, configPath string, w io.Writer) error {
+func run(ctx context.Context, configPath, secretsPath string, w io.Writer) error {
 	if configPath == "" {
 		return errors.Errorf("required flag -%s missing", flagConfigFile)
+	}
+
+	if secretsPath == "" {
+		return errors.Errorf("required flag -%s missing", flagSecretsFile)
 	}
 
 	registry := prometheus.NewRegistry()
@@ -58,6 +66,13 @@ func run(ctx context.Context, configPath string, w io.Writer) error {
 	if err != nil {
 		return errors.Wrap(err, "reading configuration")
 	}
+
+	_, _ = fmt.Fprintf(w, "Loading secrets file from path %s\n", secretsPath)
+	secrets, err := frigg.NewSecrets(secretsPath)
+	if err != nil {
+		return errors.Wrap(err, "reading secrets")
+	}
+	_ = secrets // TODO: Use secrets when implementing Grafana client
 	l := logger(w, cfg.Log.Level)
 
 	f := cfg.Initialise(l, registry)
