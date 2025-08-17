@@ -1,16 +1,13 @@
 server:
-  host: pomelo.com
-  port: 9898
-
-log:
-  level: ERROR
+  host: test.com
+  port: 8080
 
 grafana:
   endpoint: 'http://example.com'
 
 prune:
   dry: false
-  interval: '5m'
+  interval: 'invalid-duration'
   ignored_users:
     - 'admin'
   period: '720h'

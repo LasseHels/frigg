@@ -7,3 +7,11 @@ log:
 
 grafana:
   endpoint: 'http://example.com'
+
+prune:
+  dry: true
+  interval: '24h'
+  period: '10m'
+  labels:
+    app: 'grafana'
+    env: 'test'

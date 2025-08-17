@@ -2,3 +2,10 @@ server:
   port: 9876
 grafana:
   endpoint: 'http://example.com'
+
+prune:
+  dry: true
+  interval: '10m'
+  period: '720h'
+  labels:
+    app: 'grafana'
