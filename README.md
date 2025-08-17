@@ -61,4 +61,5 @@ server:
 
 If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the server host.
 
-**Note:** The secrets file does not support environment variable expansion for security reasons.
+> [!NOTE]
+> The secrets file does not support environment variable expansion for security reasons.
