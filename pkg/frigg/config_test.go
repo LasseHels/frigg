@@ -135,9 +135,7 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/missing_grafana_endpoint.yaml",
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
-				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
-				"Field validation for 'Labels' failed on the 'required' tag",
+				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 		"invalid grafana endpoint url": {
 			configPath:     "testdata/invalid_grafana_endpoint.yaml",
@@ -148,23 +146,25 @@ func TestNewConfig(t *testing.T) {
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
 			expectedConfig: nil,
-			expectedError:  "validating configuration: Key: 'Config.Prune.Period' Error:Field validation for 'Period' failed on the 'required' tag",
+			expectedError: "validating configuration: Key: 'Config.Prune.Period' Error:" +
+				"Field validation for 'Period' failed on the 'required' tag",
 		},
 		"missing prune labels": {
 			configPath:     "testdata/missing_prune_labels.yaml",
 			expectedConfig: nil,
-			expectedError:  "validating configuration: Key: 'Config.Prune.Labels' Error:Field validation for 'Labels' failed on the 'required' tag",
+			expectedError: "validating configuration: Key: 'Config.Prune.Labels' Error:" +
+				"Field validation for 'Labels' failed on the 'required' tag",
 		},
 		"invalid prune interval": {
 			configPath:     "testdata/invalid_prune_interval.yaml",
 			expectedConfig: nil,
-			expectedError:  `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
+			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
 				`  line 10: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune period": {
 			configPath:     "testdata/invalid_prune_period.yaml",
 			expectedConfig: nil,
-			expectedError:  `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
+			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
 				`  line 13: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 	}

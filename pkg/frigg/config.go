@@ -18,10 +18,10 @@ import (
 )
 
 type Config struct {
-	Log     log.Config           `yaml:"log"`
-	Server  server.Config        `yaml:"server"`
-	Grafana grafana.Config       `yaml:"grafana" validate:"required"`
-	Prune   grafana.PruneConfig  `yaml:"prune" validate:"required"`
+	Log     log.Config          `yaml:"log"`
+	Server  server.Config       `yaml:"server"`
+	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
+	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.
@@ -45,7 +45,7 @@ func (c *Config) defaults() {
 	c.Log.Level = slog.LevelInfo
 	c.Server.Host = "localhost"
 	c.Server.Port = 8080
-	
+
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 }

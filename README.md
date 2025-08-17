@@ -44,19 +44,19 @@ prune:
   interval: '10m'
   # Ignored users whose reads do not count toward the usage of a dashboard. This option can be used to ignore reads
   # from service accounts that regularly read many or all dashboards.
-  # Ignored users values are case-sensitive (default: []).
+  # Values are case-sensitive (default: []).
   ignored_users:
     - 'some-admin'
     - 'a-service-account'
-  # The period of time in the past to include reads. For example, when setting period to '30d', only reads from the last
-  # 30 days will count towards dashboard usage. IMPORTANT: Frigg does not take into account the retention period of
+  # The period of time in the past to include reads. For example, when setting period to '720h', only reads from the last
+  # 720 hours (30 days) will count towards dashboard usage. IMPORTANT: Frigg does not take into account the retention period of
   # logs in Loki. Setting period to an amount greater than Loki's retention period will not cause an error and is
   # discouraged.
   #
   # This value must be a valid Go duration string.
   #
   # Required.
-  period: '60d'
+  period: '1440h'
   # Labels that identify Grafana logs in Loki. For example, if labels are set to app: 'grafana' and env: 'production',
   # then Frigg will query Grafana logs in Loki with the selector {app="grafana", env="production"}.
   #
