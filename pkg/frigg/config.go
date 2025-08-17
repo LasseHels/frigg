@@ -45,7 +45,6 @@ func (c *Config) defaults() {
 	c.Log.Level = slog.LevelInfo
 	c.Server.Host = "localhost"
 	c.Server.Port = 8080
-
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 }
