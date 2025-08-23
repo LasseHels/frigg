@@ -115,20 +115,16 @@ func mustParseURL(rawURL string) *url.URL {
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
 	s := server.New(c.Server, logger)
 
-	// Create HTTP client for Loki and Grafana
 	httpClient := &http.Client{}
 
-	// Create Loki client
 	lokiClient := loki.NewClient(loki.ClientOptions{
 		Endpoint:   c.Loki.Endpoint,
 		HTTPClient: httpClient,
 		Logger:     logger,
 	})
 
-	// Parse Grafana endpoint
 	grafanaURL := mustParseURL(c.Grafana.Endpoint)
 
-	// Create Grafana client
 	grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
 		Logger:     logger,
 		Client:     lokiClient,
@@ -140,7 +136,6 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		return nil, errors.Wrap(err, "creating Grafana client")
 	}
 
-	// Create dashboard pruner
 	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
 		Grafana:      grafanaClient,
 		Logger:       logger,
