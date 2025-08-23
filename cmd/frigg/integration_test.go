@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"testing"
@@ -178,9 +179,15 @@ func TestDashboardPruning(t *testing.T) {
 
 	// Create dashboard pruner with short period and high interval
 	var logBuffer bytes.Buffer
+	
+	// Create a logger that writes to the buffer for testing
+	logger := slog.New(slog.NewJSONHandler(&logBuffer, &slog.HandlerOptions{
+		Level: slog.LevelDebug,
+	}))
+	
 	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
 		Grafana:      testGrafanaClient,
-		Logger:       nil, // We'll capture logs differently for this test
+		Logger:       logger,
 		Interval:     time.Hour, // High interval to ensure only one prune
 		IgnoredUsers: []string{"admin"},
 		Period:       10 * time.Minute,

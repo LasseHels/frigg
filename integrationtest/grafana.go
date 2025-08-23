@@ -61,21 +61,22 @@ func (g *Grafana) Host() string {
 	return g.host
 }
 
-// CreateAPIKey creates a Grafana API key with admin permissions.
+// CreateAPIKey creates a Grafana API key with admin permissions using the service account API.
 func (g *Grafana) CreateAPIKey(ctx context.Context, name string) (string, error) {
-	url := fmt.Sprintf("http://%s/api/auth/keys", g.host)
+	// Step 1: Create a service account
+	serviceAccountURL := fmt.Sprintf("http://%s/api/serviceaccounts", g.host)
 	
-	payload := map[string]interface{}{
+	serviceAccountPayload := map[string]interface{}{
 		"name": name,
 		"role": "Admin",
 	}
 	
-	payloadBytes, err := json.Marshal(payload)
+	payloadBytes, err := json.Marshal(serviceAccountPayload)
 	if err != nil {
 		return "", err
 	}
 	
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	req, err := http.NewRequestWithContext(ctx, "POST", serviceAccountURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
 		return "", err
 	}
@@ -92,19 +93,59 @@ func (g *Grafana) CreateAPIKey(ctx context.Context, name string) (string, error)
 		_ = resp.Body.Close()
 	}()
 	
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code creating API key: %d", resp.StatusCode)
+	if resp.StatusCode != http.StatusCreated {
+		return "", fmt.Errorf("unexpected status code creating service account: %d", resp.StatusCode)
 	}
 	
-	var result struct {
-		Key string `json:"key"`
+	var serviceAccountResult struct {
+		ID int64 `json:"id"`
 	}
 	
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&serviceAccountResult); err != nil {
 		return "", err
 	}
 	
-	return result.Key, nil
+	// Step 2: Create a token for the service account
+	tokenURL := fmt.Sprintf("http://%s/api/serviceaccounts/%d/tokens", g.host, serviceAccountResult.ID)
+	
+	tokenPayload := map[string]interface{}{
+		"name": name + "-token",
+	}
+	
+	tokenPayloadBytes, err := json.Marshal(tokenPayload)
+	if err != nil {
+		return "", err
+	}
+	
+	req, err = http.NewRequestWithContext(ctx, "POST", tokenURL, bytes.NewBuffer(tokenPayloadBytes))
+	if err != nil {
+		return "", err
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "admin")
+	
+	resp, err = client.Do(req)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("unexpected status code creating token: %d", resp.StatusCode)
+	}
+	
+	var tokenResult struct {
+		Key string `json:"key"`
+	}
+	
+	if err := json.NewDecoder(resp.Body).Decode(&tokenResult); err != nil {
+		return "", err
+	}
+	
+	return tokenResult.Key, nil
 }
 
 // CreateDashboard creates a dashboard in Grafana using the traditional HTTP API.
