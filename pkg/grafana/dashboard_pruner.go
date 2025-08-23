@@ -91,6 +91,12 @@ func (d *DashboardPruner) tick(ctx context.Context) {
 	}
 }
 
+// Prune executes a single dashboard pruning operation.
+// This method is exposed for testing purposes.
+func (d *DashboardPruner) Prune(ctx context.Context) error {
+	return d.prune(ctx)
+}
+
 func (d *DashboardPruner) prune(ctx context.Context) error {
 	d.logger.Info("Pruning Grafana dashboards")
 

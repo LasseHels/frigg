@@ -1,10 +1,13 @@
 package integrationtest
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	_ "embed"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"strconv"
 	"time"
@@ -68,6 +71,64 @@ func (l *Loki) Stop() error {
 
 func (l *Loki) Host() string {
 	return l.host
+}
+
+// PushLogs sends logs to Loki via the push API.
+func (l *Loki) PushLogs(ctx context.Context, logs []LogEntry) error {
+	url := fmt.Sprintf("http://%s/loki/api/v1/push", l.host)
+	
+	payload := map[string]interface{}{
+		"streams": []map[string]interface{}{
+			{
+				"stream": logs[0].Labels,
+				"values": make([][]string, len(logs)),
+			},
+		},
+	}
+	
+	// Convert logs to Loki format
+	values := make([][]string, len(logs))
+	for i, log := range logs {
+		values[i] = []string{
+			fmt.Sprintf("%d", log.Timestamp.UnixNano()),
+			log.Message,
+		}
+	}
+	payload["streams"].([]map[string]interface{})[0]["values"] = values
+	
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return err
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = resp.Body.Close()
+	}()
+	
+	if resp.StatusCode != http.StatusNoContent {
+		return fmt.Errorf("unexpected status code pushing logs: %d", resp.StatusCode)
+	}
+	
+	return nil
+}
+
+// LogEntry represents a single log entry to be pushed to Loki.
+type LogEntry struct {
+	Timestamp time.Time
+	Message   string
+	Labels    map[string]string
 }
 
 func mustGetHost(ctx context.Context, c testcontainers.Container, containerPort int) string {

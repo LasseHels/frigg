@@ -128,6 +128,16 @@ func (d *DashboardReads) Users() int {
 	return d.users
 }
 
+// NewDashboardReads creates a new DashboardReads instance.
+// This function is provided for testing purposes.
+func NewDashboardReads(uid string, reads, users int) DashboardReads {
+	return DashboardReads{
+		uid:   uid,
+		reads: reads,
+		users: users,
+	}
+}
+
 // extractDashboardUID from a path string.
 // Path is expected to be in the format "/api/dashboards/uid/f7fe2e95-f430-4243-a830-a556b515d902".
 func extractDashboardUID(path string) (string, error) {
