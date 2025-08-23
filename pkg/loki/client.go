@@ -18,8 +18,6 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-
-
 type ClientOptions struct {
 	Endpoint   string
 	HTTPClient httpClient
