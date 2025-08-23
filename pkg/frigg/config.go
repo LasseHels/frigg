@@ -100,8 +100,19 @@ func (c *Config) load(path string) error {
 	return nil
 }
 
+// mustParseURL parses a URL and panics if it cannot be parsed.
+// This should only be used when the URL has already been validated.
+func mustParseURL(rawURL string) *url.URL {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		panic(errors.Wrapf(err, "parsing URL %q", rawURL))
+	}
+	return u
+}
+
 // Initialise Frigg from the provided Config.
-func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) *Frigg {
+// This assumes that the provided Config has already been validated and might panic if not.
+func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
 	s := server.New(c.Server, logger)
 
 	// Create HTTP client for Loki and Grafana
@@ -115,11 +126,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 	})
 
 	// Parse Grafana endpoint
-	grafanaURL, err := url.Parse(c.Grafana.Endpoint)
-	if err != nil {
-		// This should not happen since we validate the URL in the config
-		panic(errors.Wrap(err, "parsing Grafana endpoint"))
-	}
+	grafanaURL := mustParseURL(c.Grafana.Endpoint)
 
 	// Create Grafana client
 	grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
@@ -130,7 +137,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		Token:      secrets.Grafana.Token,
 	})
 	if err != nil {
-		panic(errors.Wrap(err, "creating Grafana client"))
+		return nil, errors.Wrap(err, "creating Grafana client")
 	}
 
 	// Create dashboard pruner
@@ -144,7 +151,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		Dry:          c.Prune.Dry,
 	})
 
-	return New(logger, s, gatherer, pruner)
+	return New(logger, s, gatherer, pruner), nil
 }
 
 // validate ensures the configuration is valid.

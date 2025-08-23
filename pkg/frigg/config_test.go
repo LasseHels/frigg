@@ -145,29 +145,31 @@ func TestNewConfig(t *testing.T) {
 		"missing grafana endpoint": {
 			configPath:     "testdata/missing_grafana_endpoint.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Grafana.Endpoint' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 		"invalid grafana endpoint url": {
 			configPath:     "testdata/invalid_grafana_endpoint.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Grafana.Endpoint' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'url' tag",
+		},
+		"missing loki endpoint": {
+			configPath:     "testdata/missing_loki_endpoint.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Prune.Period' Error:" +
 				"Field validation for 'Period' failed on the 'required' tag",
 		},
 		"missing prune labels": {
 			configPath:     "testdata/missing_prune_labels.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Prune.Labels' Error:" +
 				"Field validation for 'Labels' failed on the 'required' tag",
 		},
 		"invalid prune interval": {

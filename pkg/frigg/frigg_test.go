@@ -8,6 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/LasseHels/frigg/pkg/frigg"
 	"github.com/LasseHels/frigg/pkg/grafana"
@@ -52,7 +53,8 @@ func TestFrigg_Start_HasCorrectStructure(t *testing.T) {
 	registry := prometheus.NewRegistry()
 
 	// Initialize Frigg
-	f := config.Initialise(logger, registry, secrets)
+	f, err := config.Initialise(logger, registry, secrets)
+	require.NoError(t, err)
 	assert.NotNil(t, f)
 
 	// Test that the Frigg instance was created successfully
@@ -98,7 +100,8 @@ func TestConfig_Initialise_CreatesPruner(t *testing.T) {
 	registry := prometheus.NewRegistry()
 
 	// Initialize should not panic and should return a Frigg instance
-	f := config.Initialise(logger, registry, secrets)
+	f, err := config.Initialise(logger, registry, secrets)
+	require.NoError(t, err)
 	assert.NotNil(t, f)
 }
 
@@ -136,6 +139,6 @@ func TestConfig_Initialise_PanicsOnInvalidGrafanaURL(t *testing.T) {
 
 	// Should panic due to invalid URL
 	assert.Panics(t, func() {
-		config.Initialise(logger, registry, secrets)
+		_, _ = config.Initialise(logger, registry, secrets)
 	})
 }

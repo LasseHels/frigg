@@ -1,3 +1,6 @@
+loki:
+  endpoint: 'https://loki.example.com'
+
 grafana:
   endpoint: 'https://grafana.example.com'
 

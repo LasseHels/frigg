@@ -18,9 +18,7 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type Config struct {
-	Endpoint string `yaml:"endpoint" validate:"required,url"`
-}
+
 
 type ClientOptions struct {
 	Endpoint   string

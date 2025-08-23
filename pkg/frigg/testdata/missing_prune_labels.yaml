@@ -2,6 +2,9 @@ server:
   host: test.com
   port: 8080
 
+loki:
+  endpoint: 'http://loki.example.com'
+
 grafana:
   endpoint: 'http://example.com'
 

@@ -74,7 +74,10 @@ func run(ctx context.Context, configPath, secretsPath string, w io.Writer) error
 	}
 	l := logger(w, cfg.Log.Level)
 
-	f := cfg.Initialise(l, registry, secrets)
+	f, err := cfg.Initialise(l, registry, secrets)
+	if err != nil {
+		return errors.Wrap(err, "initialising Frigg")
+	}
 
 	eg, ctx := errgroup.WithContext(ctx)
 

@@ -5,6 +5,9 @@ server:
 log:
   level: ERROR
 
+loki:
+  endpoint: 'http://loki.example.com'
+
 prune:
   dry: false
   interval: '5m'
