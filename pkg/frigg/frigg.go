@@ -38,10 +38,8 @@ func (f *Frigg) Start(ctx context.Context) error {
 
 	f.registerRoutes()
 
-	// Start the dashboard pruner in its own goroutine
 	go f.pruner.Start(ctx)
 
-	// Start the server (this blocks until stopped)
 	if err := f.server.Start(); err != nil {
 		return errors.Wrap(err, "starting server")
 	}
