@@ -1,0 +1,19 @@
+server:
+  host: pomelo.com
+  port: 9898
+
+log:
+  level: ERROR
+
+grafana:
+  endpoint: 'http://example.com'
+
+prune:
+  dry: false
+  interval: '5m'
+  ignored_users:
+    - 'admin'
+  period: '720h'
+  labels:
+    app: 'grafana'
+    env: 'test'
