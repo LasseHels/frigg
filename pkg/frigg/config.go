@@ -3,6 +3,8 @@ package frigg
 import (
 	"bytes"
 	"log/slog"
+	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 
 	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
+	"github.com/LasseHels/frigg/pkg/loki"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -24,6 +27,7 @@ type Secrets struct {
 type Config struct {
 	Log     log.Config          `yaml:"log"`
 	Server  server.Config       `yaml:"server"`
+	Loki    loki.Config         `yaml:"loki" validate:"required"`
 	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
 	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
 }
@@ -96,10 +100,53 @@ func (c *Config) load(path string) error {
 	return nil
 }
 
+// mustParseURL parses a URL and panics if it cannot be parsed.
+// This should only be used when the URL has already been validated.
+func mustParseURL(rawURL string) *url.URL {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		panic(errors.Wrapf(err, "parsing URL %q", rawURL))
+	}
+	return u
+}
+
 // Initialise Frigg from the provided Config.
-func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer) *Frigg {
+// This assumes that the provided Config has already been validated and might panic if not.
+func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
 	s := server.New(c.Server, logger)
-	return New(logger, s, gatherer)
+
+	httpClient := &http.Client{}
+
+	lokiClient := loki.NewClient(loki.ClientOptions{
+		Endpoint:   c.Loki.Endpoint,
+		HTTPClient: httpClient,
+		Logger:     logger,
+	})
+
+	grafanaURL := mustParseURL(c.Grafana.Endpoint)
+
+	grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
+		Logger:     logger,
+		Client:     lokiClient,
+		HTTPClient: httpClient,
+		Endpoint:   *grafanaURL,
+		Token:      secrets.Grafana.Token,
+	})
+	if err != nil {
+		return nil, errors.Wrap(err, "creating Grafana client")
+	}
+
+	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
+		Grafana:      grafanaClient,
+		Logger:       logger,
+		Interval:     c.Prune.Interval,
+		IgnoredUsers: c.Prune.IgnoredUsers,
+		Period:       c.Prune.Period,
+		Labels:       c.Prune.Labels,
+		Dry:          c.Prune.Dry,
+	})
+
+	return New(logger, s, gatherer, pruner), nil
 }
 
 // validate ensures the configuration is valid.

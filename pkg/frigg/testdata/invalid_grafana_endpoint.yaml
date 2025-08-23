@@ -1,3 +1,6 @@
+loki:
+  endpoint: 'http://loki.example.com'
+
 grafana:
   endpoint: 'not-a-valid-url'
 

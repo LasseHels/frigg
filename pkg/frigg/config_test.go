@@ -11,6 +11,7 @@ import (
 	"github.com/LasseHels/frigg/pkg/frigg"
 	"github.com/LasseHels/frigg/pkg/grafana"
 	"github.com/LasseHels/frigg/pkg/log"
+	"github.com/LasseHels/frigg/pkg/loki"
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
@@ -25,7 +26,8 @@ func TestNewConfig(t *testing.T) {
 		"empty config file": {
 			configPath:     "testdata/empty_config.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
 				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
 				"Field validation for 'Labels' failed on the 'required' tag",
@@ -39,6 +41,9 @@ func TestNewConfig(t *testing.T) {
 				Server: server.Config{
 					Host: "pomelo.com",
 					Port: 9898,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -66,6 +71,9 @@ func TestNewConfig(t *testing.T) {
 					Host: "localhost",
 					Port: 9876,
 				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
 				},
@@ -89,6 +97,9 @@ func TestNewConfig(t *testing.T) {
 				Server: server.Config{
 					Host: "pineapple.com",
 					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -143,6 +154,12 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
 				"Field validation for 'Endpoint' failed on the 'url' tag",
 		},
+		"missing loki endpoint": {
+			configPath:     "testdata/missing_loki_endpoint.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag",
+		},
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
 			expectedConfig: nil,
@@ -193,6 +210,9 @@ func TestNewConfig(t *testing.T) {
 			Server: server.Config{
 				Host: "banana.com",
 				Port: 1111,
+			},
+			Loki: loki.Config{
+				Endpoint: "http://loki.example.com",
 			},
 			Grafana: grafana.Config{
 				Endpoint: "http://example.com",

@@ -1,5 +1,7 @@
 server:
   host: pineapple.com
+loki:
+  endpoint: 'http://loki.example.com'
 grafana:
   endpoint: 'http://example.com'
 

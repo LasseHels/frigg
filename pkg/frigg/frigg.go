@@ -1,6 +1,7 @@
 package frigg
 
 import (
+	"context"
 	"log/slog"
 
 	"github.com/pkg/errors"
@@ -11,27 +12,39 @@ import (
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
+type dashboardPruner interface {
+	Start(ctx context.Context)
+}
+
 type Frigg struct {
 	logger   *slog.Logger
 	server   *server.Server
 	gatherer prometheus.Gatherer
+	pruner   dashboardPruner
 }
 
-func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer) *Frigg {
+func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pruner dashboardPruner) *Frigg {
 	return &Frigg{
 		logger:   logger,
 		server:   s,
 		gatherer: gatherer,
+		pruner:   pruner,
 	}
 }
 
-// Start Frigg. Start blocks until Stop is called.
-func (f *Frigg) Start() error {
+// Start Frigg. Start blocks until the context is cancelled.
+func (f *Frigg) Start(ctx context.Context) error {
 	f.logger.Info("Starting Frigg")
 
 	f.registerRoutes()
 
-	return f.server.Start()
+	go f.pruner.Start(ctx)
+
+	if err := f.server.Start(); err != nil {
+		return errors.Wrap(err, "starting server")
+	}
+
+	return nil
 }
 
 func (f *Frigg) Stop() error {
