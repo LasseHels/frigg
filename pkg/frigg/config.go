@@ -76,6 +76,7 @@ func (c *Config) defaults() {
 	c.Server.Port = 8080
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
+	c.Prune.LowerThreshold = 10
 }
 
 // load configuration from a YAML file at path.
@@ -137,13 +138,14 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 	}
 
 	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
-		Grafana:      grafanaClient,
-		Logger:       logger,
-		Interval:     c.Prune.Interval,
-		IgnoredUsers: c.Prune.IgnoredUsers,
-		Period:       c.Prune.Period,
-		Labels:       c.Prune.Labels,
-		Dry:          c.Prune.Dry,
+		Grafana:        grafanaClient,
+		Logger:         logger,
+		Interval:       c.Prune.Interval,
+		IgnoredUsers:   c.Prune.IgnoredUsers,
+		Period:         c.Prune.Period,
+		Labels:         c.Prune.Labels,
+		Dry:            c.Prune.Dry,
+		LowerThreshold: c.Prune.LowerThreshold,
 	})
 
 	return New(logger, s, gatherer, pruner), nil
