@@ -1,13 +1,15 @@
 loki:
-  endpoint: 'https://loki.example.com'
+  endpoint: ${LOKI_ENDPOINT}
 
 grafana:
-  endpoint: 'https://grafana.example.com'
+  endpoint: ${GRAFANA_ENDPOINT}
 
 prune:
-  dry: true
+  dry: false
   interval: '24h'
   period: '10m'
+  ignored_users:
+    - 'admin'
   labels:
     app: 'grafana'
     env: 'integration-test'

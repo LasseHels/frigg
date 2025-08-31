@@ -5,9 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
 	"github.com/testcontainers/testcontainers-go/wait"
 )
@@ -19,41 +23,51 @@ type Grafana struct {
 	host      string
 }
 
-func NewGrafana(ctx context.Context) *Grafana {
+func NewGrafana(t *testing.T, logConsumers ...testcontainers.LogConsumer) *Grafana {
+	t.Helper()
 	req := testcontainers.ContainerRequest{
-		Image:        "grafana/grafana:11.3.0",
+		Image:        "grafana/grafana:12.0.0", // TODO is this the version we want to use?
 		ExposedPorts: []string{fmt.Sprintf("%d", grafanaDefaultPort)},
 		Env: map[string]string{
 			"GF_SECURITY_ADMIN_PASSWORD": "admin",
 			"GF_INSTALL_PLUGINS":         "",
-			// Disable telemetry and analytics
+			// Disable telemetry and analytics.
 			"GF_ANALYTICS_REPORTING_ENABLED": "false",
 			"GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
-			// Enable API key auth
+			// Enable API key auth.
 			"GF_AUTH_ANONYMOUS_ENABLED": "false",
+			// https://grafana.com/docs/grafana/v12.0/setup-grafana/configure-grafana/#router_logging.
+			"GF_SERVER_ROUTER_LOGGING": "true",
 		},
 		WaitingFor: wait.ForAll(
 			wait.ForExposedPort(),
 			wait.ForHTTP("/api/health"),
 		),
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Consumers: logConsumers,
+		},
 	}
 
-	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
+	container, err := testcontainers.GenericContainer(t.Context(), testcontainers.GenericContainerRequest{
 		ContainerRequest: req,
 		Started:          true,
 	})
-	if err != nil {
-		panic(err)
+	require.NoError(t, err)
+
+	g := &Grafana{
+		container: container,
+		host:      mustGetHost(t.Context(), container, grafanaDefaultPort),
 	}
 
-	return &Grafana{
-		container: container,
-		host:      mustGetHost(ctx, container, grafanaDefaultPort),
-	}
+	t.Cleanup(func() {
+		require.NoError(t, g.stop())
+	})
+
+	return g
 }
 
-func (g *Grafana) Stop() error {
-	timeout := time.Millisecond
+func (g *Grafana) stop() error {
+	timeout := time.Second * 5
 	return g.container.Stop(context.Background(), &timeout)
 }
 
@@ -62,209 +76,166 @@ func (g *Grafana) Host() string {
 }
 
 // CreateAPIKey creates a Grafana API key with admin permissions using the service account API.
-func (g *Grafana) CreateAPIKey(ctx context.Context, name string) (string, error) {
-	// Step 1: Create a service account
+func (g *Grafana) CreateAPIKey(t *testing.T, name string) string {
+	t.Helper()
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/serviceaccount/#create-service-account.
 	serviceAccountURL := fmt.Sprintf("http://%s/api/serviceaccounts", g.host)
-	
-	serviceAccountPayload := map[string]interface{}{
+
+	serviceAccountPayload := map[string]any{
 		"name": name,
 		"role": "Admin",
 	}
-	
+
 	payloadBytes, err := json.Marshal(serviceAccountPayload)
-	if err != nil {
-		return "", err
-	}
-	
-	req, err := http.NewRequestWithContext(ctx, "POST", serviceAccountURL, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return "", err
-	}
-	
+	require.NoError(t, err)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, serviceAccountURL, bytes.NewBuffer(payloadBytes))
+	require.NoError(t, err)
+
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth("admin", "admin")
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
+	require.NoError(t, err)
 	defer func() {
-		_ = resp.Body.Close()
+		require.NoError(t, resp.Body.Close())
 	}()
-	
-	if resp.StatusCode != http.StatusCreated {
-		return "", fmt.Errorf("unexpected status code creating service account: %d", resp.StatusCode)
-	}
-	
+
+	require.Equal(t, http.StatusCreated, resp.StatusCode)
+
 	var serviceAccountResult struct {
 		ID int64 `json:"id"`
 	}
-	
-	if err := json.NewDecoder(resp.Body).Decode(&serviceAccountResult); err != nil {
-		return "", err
-	}
-	
-	// Step 2: Create a token for the service account
+
+	err = json.NewDecoder(resp.Body).Decode(&serviceAccountResult)
+	require.NoError(t, err)
+
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/serviceaccount/#create-service-account-tokens.
 	tokenURL := fmt.Sprintf("http://%s/api/serviceaccounts/%d/tokens", g.host, serviceAccountResult.ID)
-	
-	tokenPayload := map[string]interface{}{
+
+	tokenPayload := map[string]any{
 		"name": name + "-token",
 	}
-	
+
 	tokenPayloadBytes, err := json.Marshal(tokenPayload)
-	if err != nil {
-		return "", err
-	}
-	
-	req, err = http.NewRequestWithContext(ctx, "POST", tokenURL, bytes.NewBuffer(tokenPayloadBytes))
-	if err != nil {
-		return "", err
-	}
-	
+	require.NoError(t, err)
+
+	req, err = http.NewRequestWithContext(t.Context(), http.MethodPost, tokenURL, bytes.NewBuffer(tokenPayloadBytes))
+	require.NoError(t, err)
+
 	req.Header.Set("Content-Type", "application/json")
 	req.SetBasicAuth("admin", "admin")
-	
+
 	resp, err = client.Do(req)
-	if err != nil {
-		return "", err
-	}
+	require.NoError(t, err)
 	defer func() {
-		_ = resp.Body.Close()
+		require.NoError(t, resp.Body.Close())
 	}()
-	
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("unexpected status code creating token: %d", resp.StatusCode)
-	}
-	
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
 	var tokenResult struct {
 		Key string `json:"key"`
 	}
-	
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResult); err != nil {
-		return "", err
-	}
-	
-	return tokenResult.Key, nil
+
+	err = json.NewDecoder(resp.Body).Decode(&tokenResult)
+	require.NoError(t, err)
+
+	return tokenResult.Key
 }
 
-// CreateDashboard creates a dashboard in Grafana using the traditional HTTP API.
-func (g *Grafana) CreateDashboard(ctx context.Context, apiKey, uid, title string) error {
-	url := fmt.Sprintf("http://%s/api/dashboards/db", g.host)
-	
-	dashboard := map[string]interface{}{
-		"dashboard": map[string]interface{}{
-			"uid":           uid,
-			"title":         title,
-			"tags":          []string{"test"},
-			"timezone":      "browser",
-			"schemaVersion": 41,
-			"version":       1,
-			"panels":        []interface{}{},
-		},
-		"overwrite": true,
-	}
-	
-	payloadBytes, err := json.Marshal(dashboard)
-	if err != nil {
-		return err
-	}
-	
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(payloadBytes))
-	if err != nil {
-		return err
-	}
-	
+// CreateDashboard in Grafana using the traditional HTTP API.
+func (g *Grafana) CreateDashboard(t *testing.T, apiKey, uid string) {
+	t.Helper()
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#create-dashboard.
+	url := fmt.Sprintf(
+		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards",
+		g.host,
+	)
+
+	payload := []byte(fmt.Sprintf(`
+{
+  "metadata": {
+    "name": "%s"
+  },
+  "spec": {
+    "editable": false,
+    "schemaVersion": 41,
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": "%s",
+    "version": 0
+  }
+}
+`, uid, uid))
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewBuffer(payload))
+	require.NoError(t, err)
+
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
+	require.NoError(t, err)
 	defer func() {
-		_ = resp.Body.Close()
+		require.NoError(t, resp.Body.Close())
 	}()
-	
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code creating dashboard: %d", resp.StatusCode)
-	}
-	
-	return nil
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+
+	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 }
 
-// GetDashboard retrieves a dashboard by UID using the traditional HTTP API.
-func (g *Grafana) GetDashboard(ctx context.Context, apiKey, uid string) (map[string]interface{}, error) {
-	url := fmt.Sprintf("http://%s/api/dashboards/uid/%s", g.host, uid)
-	
-	req, err := http.NewRequestWithContext(ctx, "GET", url, http.NoBody)
-	if err != nil {
-		return nil, err
-	}
-	
+func (g *Grafana) AssertDashboardExists(t *testing.T, apiKey, uid string) {
+	t.Helper()
+	g.assertGetDashboardStatusCode(t, apiKey, uid, http.StatusOK)
+}
+
+func (g *Grafana) AssertDashboardDoesNotExist(t *testing.T, apiKey, uid string) {
+	t.Helper()
+	g.assertGetDashboardStatusCode(t, apiKey, uid, http.StatusNotFound)
+}
+
+func (g *Grafana) assertGetDashboardStatusCode(t *testing.T, apiKey, uid string, expectedStatusCode int) {
+	t.Helper()
+	statusCode := g.getDashboard(t, apiKey, uid)
+	assert.Equal(
+		t,
+		expectedStatusCode,
+		statusCode,
+		"expected code %d when retrieving dashboard with UID %q",
+		expectedStatusCode,
+		uid,
+	)
+}
+
+// getDashboard by UID using the traditional HTTP API.
+func (g *Grafana) getDashboard(t *testing.T, apiKey, uid string) int {
+	t.Helper()
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#get-dashboard.
+	url := fmt.Sprintf(
+		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/%s",
+		g.host,
+		uid,
+	)
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodGet, url, http.NoBody)
+	require.NoError(t, err)
+
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	
+
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
-	}
+	require.NoError(t, err)
 	defer func() {
-		_ = resp.Body.Close()
+		require.NoError(t, resp.Body.Close())
 	}()
-	
-	if resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("dashboard not found")
-	}
-	
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code getting dashboard: %d", resp.StatusCode)
-	}
-	
-	var result map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-	
-	return result, nil
-}
 
-// DeleteDashboard deletes a dashboard by UID using the traditional HTTP API.
-func (g *Grafana) DeleteDashboard(ctx context.Context, apiKey, uid string) error {
-	url := fmt.Sprintf("http://%s/api/dashboards/uid/%s", g.host, uid)
-	
-	req, err := http.NewRequestWithContext(ctx, "DELETE", url, http.NoBody)
-	if err != nil {
-		return err
-	}
-	
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-	
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
-	
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("unexpected status code deleting dashboard: %d", resp.StatusCode)
-	}
-	
-	return nil
-}
-
-// DashboardExists checks if a dashboard exists by UID.
-func (g *Grafana) DashboardExists(ctx context.Context, apiKey, uid string) (bool, error) {
-	_, err := g.GetDashboard(ctx, apiKey, uid)
-	if err != nil {
-		if err.Error() == "dashboard not found" {
-			return false, nil
-		}
-		return false, err
-	}
-	return true, nil
+	return resp.StatusCode
 }

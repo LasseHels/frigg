@@ -27,16 +27,9 @@ type lokiPushPayload struct {
 }
 
 func TestClient_QueryRange_Integration(t *testing.T) {
-	if testing.Short() {
-		t.Skip("skipping integration test in short mode")
-	}
+	integrationtest.SkipIfShort(t)
 
-	lokiContainer := integrationtest.NewLoki(t.Context())
-	t.Cleanup(func() {
-		if err := lokiContainer.Stop(); err != nil {
-			t.Logf("Failed to terminate Loki container: %v", err)
-		}
-	})
+	lokiContainer := integrationtest.NewLoki(t)
 
 	now := time.Now().UTC()
 	firstTimestamp := now.Add(-30 * time.Minute)
