@@ -21,13 +21,14 @@ type grafanaClient interface {
 }
 
 type DashboardPruner struct {
-	grafana      grafanaClient
-	logger       *slog.Logger
-	interval     time.Duration
-	ignoredUsers []string
-	period       time.Duration
-	labels       map[string]string
-	dry          bool
+	grafana        grafanaClient
+	logger         *slog.Logger
+	interval       time.Duration
+	ignoredUsers   []string
+	period         time.Duration
+	labels         map[string]string
+	dry            bool
+	lowerThreshold int
 }
 
 type NewDashboardPrunerOptions struct {
@@ -49,19 +50,22 @@ type NewDashboardPrunerOptions struct {
 	// Dry determines whether to actually delete dashboards.
 	// If true, DashboardPruner will only log which dashboards would be deleted instead of actually deleting them.
 	Dry bool
+	// See UsedDashboardsOptions.LowerThreshold.
+	LowerThreshold int
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 	logger := opts.Logger.With(slog.Bool("dry", opts.Dry))
 
 	return &DashboardPruner{
-		grafana:      opts.Grafana,
-		logger:       logger,
-		interval:     opts.Interval,
-		ignoredUsers: opts.IgnoredUsers,
-		period:       opts.Period,
-		labels:       opts.Labels,
-		dry:          opts.Dry,
+		grafana:        opts.Grafana,
+		logger:         logger,
+		interval:       opts.Interval,
+		ignoredUsers:   opts.IgnoredUsers,
+		period:         opts.Period,
+		labels:         opts.Labels,
+		dry:            opts.Dry,
+		lowerThreshold: opts.LowerThreshold,
 	}
 }
 
@@ -101,7 +105,10 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 
 	d.logger.Info("Found all Grafana dashboards", slog.Int("count", len(all)))
 
-	opts := UsedDashboardsOptions{IgnoredUsers: d.ignoredUsers}
+	opts := UsedDashboardsOptions{
+		IgnoredUsers:   d.ignoredUsers,
+		LowerThreshold: d.lowerThreshold,
+	}
 	used, err := d.grafana.UsedDashboards(ctx, d.labels, d.period, opts)
 	if err != nil {
 		return errors.Wrap(err, "fetching used Grafana dashboards")

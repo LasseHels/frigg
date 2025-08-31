@@ -66,6 +66,17 @@ prune:
   labels:
     app: 'grafana'
     env: 'production'
+  # Lower threshold under which pruning is cancelled. If fewer than lower_threshold logs are found when pruning
+  # dashboards, an error is returned and pruning stops.
+  #
+  # Since Grafana doesn't expose a formal API for dashboard usage, Frigg uses Grafana's logs as an API. This is
+  # dubious as Grafana makes no promise that the format of its logs will remain stable. If a Grafana update causes
+  # the format of logs upon which Frigg relies to change, then we'd prefer for Frigg to fail fast rather than
+  # erroneously consider all dashboards unused. In other words, lower threshold is a safety mechanism to prevent Frigg
+  # from deleting all dashboards.
+  #
+  # Must be greater than or equal to 0 (default: 10).
+  lower_threshold: 10
 ```
 
 ### Secrets File Structure
