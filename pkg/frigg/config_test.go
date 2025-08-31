@@ -57,6 +57,7 @@ func TestNewConfig(t *testing.T) {
 						"app": "grafana",
 						"env": "test",
 					},
+					LowerThreshold: 50,
 				},
 			},
 			expectedError: "",
@@ -84,6 +85,7 @@ func TestNewConfig(t *testing.T) {
 					Labels: map[string]string{
 						"app": "grafana",
 					},
+					LowerThreshold: 10,
 				},
 			},
 			expectedError: "",
@@ -111,6 +113,7 @@ func TestNewConfig(t *testing.T) {
 					Labels: map[string]string{
 						"app": "grafana",
 					},
+					LowerThreshold: 10,
 				},
 			},
 			expectedError: "",
@@ -184,6 +187,18 @@ func TestNewConfig(t *testing.T) {
 			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
 				`  line 13: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
+		"invalid prune lower threshold": {
+			configPath:     "testdata/invalid_prune_lower_threshold.yaml",
+			expectedConfig: nil,
+			expectedError: "loading configuration: parsing config file: yaml: unmarshal " +
+				"errors:\n  line 23: cannot unmarshal !!str `nope` into int",
+		},
+		"negative prune lower threshold": {
+			configPath:     "testdata/negative_prune_lower_threshold.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.LowerThreshold' " +
+				"Error:Field validation for 'LowerThreshold' failed on the 'min' tag",
+		},
 	}
 
 	for name, tt := range tests {
@@ -224,6 +239,7 @@ func TestNewConfig(t *testing.T) {
 				Labels: map[string]string{
 					"app": "grafana",
 				},
+				LowerThreshold: 10,
 			},
 		}
 

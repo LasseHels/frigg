@@ -20,4 +20,4 @@ prune:
   labels:
     app: 'grafana'
     env: 'test'
-  lower_threshold: 50
+  lower_threshold: -10
