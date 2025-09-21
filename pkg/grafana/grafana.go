@@ -148,7 +148,8 @@ type DashboardKey struct {
 	namespace string
 }
 
-// extractPathVariables from a string in the format "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
+// extractPathVariables from a string in the format
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
 //
 // A dashboard in Grafana v12 is uniquely identified by its combined uid and namespace.
 //
@@ -179,7 +180,12 @@ func extractPathVariables(path string) (DashboardKey, error) {
 	expectedSeventhPart := "dashboards"
 	actualSeventhPart := pathParts[6]
 	if actualSeventhPart != expectedSeventhPart {
-		return DashboardKey{}, errors.Wrapf(err, "expected seventh part %q but got %q", expectedSeventhPart, actualSeventhPart)
+		return DashboardKey{}, errors.Wrapf(
+			err,
+			"expected seventh part %q but got %q",
+			expectedSeventhPart,
+			actualSeventhPart,
+		)
 	}
 
 	uid := pathParts[7]

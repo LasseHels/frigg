@@ -222,13 +222,13 @@ func (g *Grafana) getDashboard(t assert.TestingT, apiKey, uid string) int {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
-	assert.NoError(t, err)
+	assert.NoError(t, err) //nolint:testifylint
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
-	assert.NoError(t, err)
+	assert.NoError(t, err) //nolint:testifylint
 	defer func() {
 		assert.NoError(t, resp.Body.Close())
 	}()
