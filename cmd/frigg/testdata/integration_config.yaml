@@ -1,3 +1,6 @@
+log:
+  level: 'DEBUG'
+
 loki:
   endpoint: ${LOKI_ENDPOINT}
 
@@ -6,10 +9,11 @@ grafana:
 
 prune:
   dry: false
-  interval: '24h'
+  interval: '1s'
   period: '10m'
   ignored_users:
     - 'admin'
   labels:
     app: 'grafana'
     env: 'integration-test'
+  lower_threshold: 2

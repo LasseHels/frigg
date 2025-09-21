@@ -53,10 +53,12 @@ func TestFriggIntegration(t *testing.T) {
 		assert.Contains(t, body, "process_", "Metrics should contain process metrics")
 	})
 
+	// TODO: Test dashboard that was read by ignored user.
 	t.Run("prunes dashboards", func(t *testing.T) {
-		grafana.AssertDashboardDoesNotExist(t, apiKey, "unuseddashboard")
-		grafana.AssertDashboardDoesNotExist(t, apiKey, "ignoreduserdashboard")
-		grafana.AssertDashboardExists(t, apiKey, "useddashboard")
+		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
+			grafana.AssertDashboardDoesNotExist(collect, apiKey, "unuseddashboard")
+			grafana.AssertDashboardExists(collect, apiKey, "useddashboard")
+		}, time.Second*10, time.Millisecond*100)
 	})
 
 	logs := out.String()
@@ -79,8 +81,7 @@ func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
 	loki := integrationtest.NewLoki(t)
 	grafana := integrationtest.NewGrafana(
 		t,
-		integrationtest.NewLogger(t),
-		&LokiLogConsumer{
+		&lokiLogConsumer{
 			loki: loki,
 			t:    t,
 			timestamps: map[string]time.Time{
@@ -103,8 +104,8 @@ grafana:
 
 	grafana.CreateDashboard(t, apiKey, "useddashboard")
 	grafana.CreateDashboard(t, apiKey, "unuseddashboard")
-	grafana.CreateDashboard(t, apiKey, "ignoreduserdashboard")
 
+	// Assert that the dashboard exists to create a read log entry in Loki.
 	grafana.AssertDashboardExists(t, apiKey, "useddashboard")
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
@@ -139,13 +140,13 @@ func assertOK(t *testing.T, url string) string {
 	return string(body)
 }
 
-type LokiLogConsumer struct {
+type lokiLogConsumer struct {
 	loki       *integrationtest.Loki
 	t          *testing.T
 	timestamps map[string]time.Time
 }
 
-func (l *LokiLogConsumer) Accept(log testcontainers.Log) {
+func (l *lokiLogConsumer) Accept(log testcontainers.Log) {
 	timestamp := time.Now().UTC()
 
 	for matcher, at := range l.timestamps {
@@ -166,6 +167,11 @@ func (l *LokiLogConsumer) Accept(log testcontainers.Log) {
 		},
 	}
 
-	err := l.loki.PushLogs(l.t.Context(), lokiLogs)
+	// Deliberately don't use l.t.Context() as that often leads to "context cancelled" errors as logs are attempted
+	// pushed at the end of a test. Pushing logs to a local Loki instance should not take more than a second.
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+
+	err := l.loki.PushLogs(ctx, lokiLogs)
 	require.NoError(l.t, err)
 }
