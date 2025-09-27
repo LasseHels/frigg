@@ -235,12 +235,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 2)
 
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
 		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 3, results[0].Reads())
 		assert.Equal(t, 2, results[0].Users())
 
-		assert.Equal(t, "dashboard2", results[1].UID())
+		assert.Equal(t, "dashboard2", results[1].Name())
 		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 1, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
@@ -296,12 +296,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 2)
 
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
 		assert.Equal(t, "blue", results[0].Namespace())
 		assert.Equal(t, 1, results[0].Reads())
 		assert.Equal(t, 1, results[0].Users())
 
-		assert.Equal(t, "dashboard1", results[1].UID())
+		assert.Equal(t, "dashboard1", results[1].Name())
 		assert.Equal(t, "orange", results[1].Namespace())
 		assert.Equal(t, 2, results[1].Reads())
 		assert.Equal(t, 2, results[1].Users())
@@ -366,12 +366,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 2) // dashboard2 should be excluded as it's only accessed by ignored user.
 
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
 		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 1, results[0].Reads()) // Only 1 read from non-ignored user.
 		assert.Equal(t, 1, results[0].Users()) // Only 1 unique non-ignored user.
 
-		assert.Equal(t, "dashboard3", results[1].UID())
+		assert.Equal(t, "dashboard3", results[1].Name())
 		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 1, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
@@ -422,12 +422,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 		// In our mock, each chunk returns the same 2 logs, so with 5 chunks:
 		// - dashboard1 should have 5 reads from user1.
 		// - dashboard2 should have 5 reads from user2.
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
 		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 5, results[0].Reads())
 		assert.Equal(t, 1, results[0].Users())
 
-		assert.Equal(t, "dashboard2", results[1].UID())
+		assert.Equal(t, "dashboard2", results[1].Name())
 		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 5, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())

@@ -108,15 +108,15 @@ func (o *UsedDashboardsOptions) validate() error {
 }
 
 type DashboardReads struct {
-	uid       string
+	name      string
 	namespace string
 	reads     int
 	users     int
 }
 
-// UID of the dashboard.
-func (d *DashboardReads) UID() string {
-	return d.uid
+// Name of the dashboard.
+func (d *DashboardReads) Name() string {
+	return d.name
 }
 
 // Namespace of the dashboard.
@@ -136,22 +136,25 @@ func (d *DashboardReads) Users() int {
 
 func (d *DashboardReads) Key() DashboardKey {
 	return DashboardKey{
-		uid:       d.uid,
+		name:      d.name,
 		namespace: d.namespace,
 	}
 }
 
-// DashboardKey uniquely identifies a dashboard in Grafana by its combined UID and namespace.
+// DashboardKey uniquely identifies a dashboard in Grafana by its combined name and namespace.
 // TODO: Make this into a slog attribute?
 type DashboardKey struct {
-	uid       string
+	name      string
 	namespace string
 }
 
 // extractPathVariables from a string in the format
 // "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
 //
-// A dashboard in Grafana v12 is uniquely identified by its combined uid and namespace.
+// For some reason that is not fully clear to me, the path parameter is called :uid, but it actually refers to the
+// dashboard's name. See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-.
+//
+// A dashboard in Grafana v12 is uniquely identified by its combined name and namespace.
 //
 // See also https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure.
 func extractPathVariables(path string) (DashboardKey, error) {
@@ -188,11 +191,11 @@ func extractPathVariables(path string) (DashboardKey, error) {
 		)
 	}
 
-	uid := pathParts[7]
+	name := pathParts[7]
 	namespace := pathParts[5]
 
 	return DashboardKey{
-		uid:       uid,
+		name:      name,
 		namespace: namespace,
 	}, nil
 }
@@ -309,22 +312,22 @@ func (c *Client) UsedDashboards(
 	result := make([]DashboardReads, 0, len(readsByUID))
 	for vars, users := range readsByUID {
 		result = append(result, DashboardReads{
-			uid:       vars.uid,
+			name:      vars.name,
 			namespace: vars.namespace,
 			reads:     readCounts[vars],
 			users:     len(users),
 		})
 	}
 
-	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard UID for consistency.
+	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard name for consistency.
 	sort.Slice(result, func(i, j int) bool {
-		// Dashboard UIDs are unique only within their namespace. If two dashboards have the same UID,
+		// Dashboard name are unique only within their namespace. If two dashboards have the same name,
 		// we sort by namespace.
-		if result[i].uid == result[j].uid {
+		if result[i].name == result[j].name {
 			return result[i].namespace < result[j].namespace
 		}
 
-		return result[i].uid < result[j].uid
+		return result[i].name < result[j].name
 	})
 
 	return result, nil
@@ -340,7 +343,7 @@ type Dashboard struct {
 
 func (d *Dashboard) Key() DashboardKey {
 	return DashboardKey{
-		uid:       d.Name, // See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-.
+		name:      d.Name,
 		namespace: d.Namespace,
 	}
 }

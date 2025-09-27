@@ -130,14 +130,16 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
 				return []Dashboard{
 					{
-						UID:  "dashboard1",
-						Name: "Dashboard 1",
-						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+						UID:       "dashboard1",
+						Name:      "Dashboard 1",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
 					},
 					{
-						UID:  "dashboard2",
-						Name: "Dashboard 2",
-						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+						UID:       "dashboard2",
+						Name:      "Dashboard 2",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
 					},
 				}, nil
 			},
@@ -429,11 +431,12 @@ func TestDashboardPruner_Prune(t *testing.T) {
 	})
 }
 
-func newMockDashboardReads(uid string, reads, users int) DashboardReads {
+func newMockDashboardReads(name string, reads, users int) DashboardReads {
 	return DashboardReads{
-		uid:   uid,
-		reads: reads,
-		users: users,
+		name:      name,
+		namespace: "default",
+		reads:     reads,
+		users:     users,
 	}
 }
 
