@@ -118,7 +118,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
 {"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":0}
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":0}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"uids":""}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"deleted_dashboards":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -176,7 +176,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":2}
 {"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"cbf15242-fec5-4272-be50-1f83322ecf2c","name":"dashboard1","namespace":"default","reads":10,"users":2,"range":"24h0m0s"}
 {"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"50c3ea9d-d578-4c0f-a9c4-128577783c03","name":"dashboard2","namespace":"default","reads":5,"users":1,"range":"24h0m0s"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"uids":""}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"deleted_dashboards":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -249,7 +249,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 {"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"441c13ff-dc1d-4d90-9984-b15532e626ff","name":"dashboard2","namespace":"default","raw_json":"{\"title\": \"Dashboard 2\"}"}
 {"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"541517b1-3e42-497b-8038-25905320396e","name":"dashboard3","namespace":"default","raw_json":"{\"title\": \"Dashboard 3\"}"}
 {"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"541517b1-3e42-497b-8038-25905320396e","name":"dashboard3","namespace":"default","raw_json":"{\"title\": \"Dashboard 3\"}"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":2,"uids":"441c13ff-dc1d-4d90-9984-b15532e626ff, 541517b1-3e42-497b-8038-25905320396e"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":2,"deleted_dashboards":"default/dashboard2, default/dashboard3"}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -314,7 +314,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":true,"count":1}
 {"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"3f02045e-5d94-4dbe-94e8-1353b1aede29","name":"dashboard1","namespace":"blueberry"}
 {"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"952e2e84-2515-4f7c-b965-151671b3300c","name":"dashboard2","namespace":"blueberry"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":true,"deleted_count":0,"uids":""}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":true,"deleted_count":0,"deleted_dashboards":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})

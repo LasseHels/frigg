@@ -146,7 +146,7 @@ func (g *Grafana) CreateAPIKey(t *testing.T, name string) string {
 }
 
 // CreateDashboard in Grafana using the traditional HTTP API.
-func (g *Grafana) CreateDashboard(t *testing.T, apiKey, uid string) {
+func (g *Grafana) CreateDashboard(t *testing.T, apiKey, name string) {
 	t.Helper()
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#create-dashboard.
 	url := fmt.Sprintf("http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards", g.host)
@@ -169,7 +169,7 @@ func (g *Grafana) CreateDashboard(t *testing.T, apiKey, uid string) {
     "version": 0
   }
 }
-`, uid, uid))
+`, name, name))
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewBuffer(payload))
 	require.NoError(t, err)
@@ -189,33 +189,33 @@ func (g *Grafana) CreateDashboard(t *testing.T, apiKey, uid string) {
 	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
 }
 
-func (g *Grafana) AssertDashboardExists(t assert.TestingT, apiKey, uid string) {
-	g.assertGetDashboardStatusCode(t, apiKey, uid, http.StatusOK)
+func (g *Grafana) AssertDashboardExists(t assert.TestingT, apiKey, name string) {
+	g.assertGetDashboardStatusCode(t, apiKey, name, http.StatusOK)
 }
 
-func (g *Grafana) AssertDashboardDoesNotExist(t assert.TestingT, apiKey, uid string) {
-	g.assertGetDashboardStatusCode(t, apiKey, uid, http.StatusNotFound)
+func (g *Grafana) AssertDashboardDoesNotExist(t assert.TestingT, apiKey, name string) {
+	g.assertGetDashboardStatusCode(t, apiKey, name, http.StatusNotFound)
 }
 
-func (g *Grafana) assertGetDashboardStatusCode(t assert.TestingT, apiKey, uid string, expectedStatusCode int) {
-	statusCode := g.getDashboard(t, apiKey, uid)
+func (g *Grafana) assertGetDashboardStatusCode(t assert.TestingT, apiKey, name string, expectedStatusCode int) {
+	statusCode := g.getDashboard(t, apiKey, name)
 	assert.Equal(
 		t,
 		expectedStatusCode,
 		statusCode,
-		"expected code %d when retrieving dashboard with UID %q",
+		"expected code %d when retrieving dashboard with name %q",
 		expectedStatusCode,
-		uid,
+		name,
 	)
 }
 
-// getDashboard by UID using the traditional HTTP API.
-func (g *Grafana) getDashboard(t assert.TestingT, apiKey, uid string) int {
+// getDashboard by name using the traditional HTTP API.
+func (g *Grafana) getDashboard(t assert.TestingT, apiKey, name string) int {
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#get-dashboard.
 	url := fmt.Sprintf(
 		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/%s",
 		g.host,
-		uid,
+		name,
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)

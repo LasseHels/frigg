@@ -2,6 +2,7 @@ package grafana
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -116,7 +117,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 
 	d.logger.Info("Found used Grafana dashboards", slog.Int("count", len(used)))
 	usedDashboards := d.usedMap(used)
-	var deletedUIDs []string
+	var deleted []string
 
 	for _, dashboard := range all {
 		dashboardLogger := d.logger.With(
@@ -145,13 +146,13 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 			return errors.Wrapf(err, "deleting unused dashboard %s", dashboard.UID)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
-		deletedUIDs = append(deletedUIDs, dashboard.UID)
+		deleted = append(deleted, fmt.Sprintf("%s/%s", dashboard.Namespace, dashboard.Name))
 	}
 
 	d.logger.Info(
 		"Finished pruning Grafana dashboards",
-		slog.Int("deleted_count", len(deletedUIDs)),
-		slog.String("uids", strings.Join(deletedUIDs, ", ")),
+		slog.Int("deleted_count", len(deleted)),
+		slog.String("deleted_dashboards", strings.Join(deleted, ", ")),
 	)
 
 	return nil

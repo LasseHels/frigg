@@ -12,7 +12,7 @@ prune:
   interval: '1s'
   period: '10m'
   ignored_users:
-    - 'admin'
+    - 'sa-1-john-doe'
   labels:
     app: 'grafana'
     env: 'integration-test'
