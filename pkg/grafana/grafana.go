@@ -108,14 +108,20 @@ func (o *UsedDashboardsOptions) validate() error {
 }
 
 type DashboardReads struct {
-	uid   string
-	reads int
-	users int
+	name      string
+	namespace string
+	reads     int
+	users     int
 }
 
-// UID of the dashboard.
-func (d *DashboardReads) UID() string {
-	return d.uid
+// Name of the dashboard.
+func (d *DashboardReads) Name() string {
+	return d.name
+}
+
+// Namespace of the dashboard.
+func (d *DashboardReads) Namespace() string {
+	return d.namespace
 }
 
 // Reads is the number of times the dashboard has been read.
@@ -128,14 +134,70 @@ func (d *DashboardReads) Users() int {
 	return d.users
 }
 
-// extractDashboardUID from a path string.
-// Path is expected to be in the format "/api/dashboards/uid/f7fe2e95-f430-4243-a830-a556b515d902".
-func extractDashboardUID(path string) (string, error) {
-	pathParts := strings.Split(path, "/")
-	if len(pathParts) < 5 || pathParts[3] != "uid" {
-		return "", fmt.Errorf("unexpected path format: %q, expected format /api/dashboards/uid/:uid", path)
+func (d *DashboardReads) Key() DashboardKey {
+	return DashboardKey{
+		name:      d.name,
+		namespace: d.namespace,
 	}
-	return pathParts[4], nil
+}
+
+// DashboardKey uniquely identifies a dashboard in Grafana by its combined name and namespace.
+// TODO: Make this into a slog attribute?
+type DashboardKey struct {
+	name      string
+	namespace string
+}
+
+// extractPathVariables from a string in the format
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
+//
+// For some reason that is not fully clear to me, the path parameter is called :uid, but it actually refers to the
+// dashboard's name. See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-.
+//
+// A dashboard in Grafana v12 is uniquely identified by its combined name and namespace.
+//
+// See also https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure.
+func extractPathVariables(path string) (DashboardKey, error) {
+	pathParts := strings.Split(path, "/")
+	expectedFormat := "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"
+	err := fmt.Errorf("unexpected path format: %q, expected format %q", path, expectedFormat)
+
+	expectedPartCount := 8
+	actualPartCount := len(pathParts)
+	if actualPartCount != expectedPartCount {
+		return DashboardKey{}, errors.Wrapf(err, "expected part count %d but got %d", expectedPartCount, actualPartCount)
+	}
+
+	expectedThirdPart := "dashboard.grafana.app"
+	actualThirdPart := pathParts[2]
+	if actualThirdPart != expectedThirdPart {
+		return DashboardKey{}, errors.Wrapf(err, "expected third part %q but got %q", expectedThirdPart, actualThirdPart)
+	}
+
+	expectedFifthPart := "namespaces"
+	actualFifthPart := pathParts[4]
+	if actualFifthPart != expectedFifthPart {
+		return DashboardKey{}, errors.Wrapf(err, "expected fifth part %q but got %q", expectedFifthPart, actualFifthPart)
+	}
+
+	expectedSeventhPart := "dashboards"
+	actualSeventhPart := pathParts[6]
+	if actualSeventhPart != expectedSeventhPart {
+		return DashboardKey{}, errors.Wrapf(
+			err,
+			"expected seventh part %q but got %q",
+			expectedSeventhPart,
+			actualSeventhPart,
+		)
+	}
+
+	name := pathParts[7]
+	namespace := pathParts[5]
+
+	return DashboardKey{
+		name:      name,
+		namespace: namespace,
+	}, nil
 }
 
 // UsedDashboards returns information about dashboard usage in range (now() - r) to now().
@@ -183,10 +245,13 @@ func (c *Client) UsedDashboards(
 	}
 
 	query := fmt.Sprintf(`%s
-|= "/api/dashboards/uid/:uid"
+|= "/apis/dashboard.grafana.app/"
+|= "/namespaces/"
+|= "/dashboards/"
 |= "Request Completed"
 | logfmt
-| handler = "/api/dashboards/uid/:uid"`, labelStr)
+| method = "GET"
+| handler = "/apis/*"`, labelStr)
 
 	end := time.Now().UTC()
 	start := end.Add(-r)
@@ -211,8 +276,8 @@ func (c *Client) UsedDashboards(
 		return nil, fmt.Errorf("found fewer logs (%d) than the lower threshold (%d)", len(logs), opts.LowerThreshold)
 	}
 
-	readsByUID := make(map[string]map[string]struct{})
-	readCounts := make(map[string]int)
+	readsByUID := make(map[DashboardKey]map[string]struct{})
+	readCounts := make(map[DashboardKey]int)
 
 	for _, log := range logs {
 		stream := log.Stream()
@@ -222,9 +287,9 @@ func (c *Client) UsedDashboards(
 			return nil, fmt.Errorf("could not find path in stream labels: %v", stream)
 		}
 
-		dashboardUID, err := extractDashboardUID(path)
+		key, err := extractPathVariables(path)
 		if err != nil {
-			return nil, err
+			return nil, errors.Wrapf(err, "extracting variables from path %q", path)
 		}
 
 		user, ok := stream["uname"]
@@ -236,26 +301,33 @@ func (c *Client) UsedDashboards(
 			continue
 		}
 
-		readCounts[dashboardUID]++
+		readCounts[key]++
 
-		if _, exists := readsByUID[dashboardUID]; !exists {
-			readsByUID[dashboardUID] = make(map[string]struct{})
+		if _, exists := readsByUID[key]; !exists {
+			readsByUID[key] = make(map[string]struct{})
 		}
-		readsByUID[dashboardUID][user] = struct{}{}
+		readsByUID[key][user] = struct{}{}
 	}
 
 	result := make([]DashboardReads, 0, len(readsByUID))
-	for uid, users := range readsByUID {
+	for vars, users := range readsByUID {
 		result = append(result, DashboardReads{
-			uid:   uid,
-			reads: readCounts[uid],
-			users: len(users),
+			name:      vars.name,
+			namespace: vars.namespace,
+			reads:     readCounts[vars],
+			users:     len(users),
 		})
 	}
 
-	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard UID for consistency.
+	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard name for consistency.
 	sort.Slice(result, func(i, j int) bool {
-		return result[i].uid < result[j].uid
+		// Dashboard name are unique only within their namespace. If two dashboards have the same name,
+		// we sort by namespace.
+		if result[i].name == result[j].name {
+			return result[i].namespace < result[j].namespace
+		}
+
+		return result[i].name < result[j].name
 	})
 
 	return result, nil
@@ -267,6 +339,13 @@ type Dashboard struct {
 	UID               string          `json:"uid"`
 	CreationTimestamp time.Time       `json:"creationTimestamp"`
 	Spec              json.RawMessage `json:"spec"`
+}
+
+func (d *Dashboard) Key() DashboardKey {
+	return DashboardKey{
+		name:      d.Name,
+		namespace: d.Namespace,
+	}
 }
 
 type dashboardListResponse struct {
@@ -392,6 +471,7 @@ func (c *Client) DeleteDashboard(ctx context.Context, uid string) error {
 		return errors.New("dashboard UID must not be empty")
 	}
 
+	// TODO: Ability to delete in other namespaces than default.
 	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", "default", "dashboards", uid)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), http.NoBody)

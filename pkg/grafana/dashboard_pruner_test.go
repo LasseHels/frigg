@@ -130,14 +130,16 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
 				return []Dashboard{
 					{
-						UID:  "dashboard1",
-						Name: "Dashboard 1",
-						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+						UID:       "cbf15242-fec5-4272-be50-1f83322ecf2c",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
 					},
 					{
-						UID:  "dashboard2",
-						Name: "Dashboard 2",
-						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+						UID:       "50c3ea9d-d578-4c0f-a9c4-128577783c03",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
 					},
 				}, nil
 			},
@@ -172,8 +174,8 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
 {"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":2}
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":2}
-{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
-{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","reads":5,"users":1,"range":"24h0m0s"}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"cbf15242-fec5-4272-be50-1f83322ecf2c","name":"dashboard1","namespace":"default","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"50c3ea9d-d578-4c0f-a9c4-128577783c03","name":"dashboard2","namespace":"default","reads":5,"users":1,"range":"24h0m0s"}
 {"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":0,"uids":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
@@ -188,19 +190,22 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
 				return []Dashboard{
 					{
-						UID:  "dashboard1",
-						Name: "Dashboard 1",
-						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+						UID:       "a22d74c5-83c5-4cd5-88a9-2af0544bdac2",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
 					},
 					{
-						UID:  "dashboard2",
-						Name: "Dashboard 2",
-						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+						UID:       "441c13ff-dc1d-4d90-9984-b15532e626ff",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
 					},
 					{
-						UID:  "dashboard3",
-						Name: "Dashboard 3",
-						Spec: json.RawMessage(`{"title": "Dashboard 3"}`),
+						UID:       "541517b1-3e42-497b-8038-25905320396e",
+						Name:      "dashboard3",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 3"}`),
 					},
 				}, nil
 			},
@@ -239,12 +244,12 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
 {"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":3}
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":1}
-{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
-{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
-{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"dashboard2","name":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
-{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
-{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"dashboard3","name":"Dashboard 3","raw_json":"{\"title\": \"Dashboard 3\"}"}
-{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":2,"uids":"dashboard2, dashboard3"}
+{"level":"DEBUG","msg":"Skipping used dashboard","dry":false,"uid":"a22d74c5-83c5-4cd5-88a9-2af0544bdac2","name":"dashboard1","namespace":"default","reads":10,"users":2,"range":"24h0m0s"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"441c13ff-dc1d-4d90-9984-b15532e626ff","name":"dashboard2","namespace":"default","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"441c13ff-dc1d-4d90-9984-b15532e626ff","name":"dashboard2","namespace":"default","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"541517b1-3e42-497b-8038-25905320396e","name":"dashboard3","namespace":"default","raw_json":"{\"title\": \"Dashboard 3\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"uid":"541517b1-3e42-497b-8038-25905320396e","name":"dashboard3","namespace":"default","raw_json":"{\"title\": \"Dashboard 3\"}"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"deleted_count":2,"uids":"441c13ff-dc1d-4d90-9984-b15532e626ff, 541517b1-3e42-497b-8038-25905320396e"}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
@@ -258,14 +263,16 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
 				return []Dashboard{
 					{
-						UID:  "dashboard1",
-						Name: "Dashboard 1",
-						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+						UID:       "3f02045e-5d94-4dbe-94e8-1353b1aede29",
+						Name:      "dashboard1",
+						Namespace: "blueberry",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
 					},
 					{
-						UID:  "dashboard2",
-						Name: "Dashboard 2",
-						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+						UID:       "952e2e84-2515-4f7c-b965-151671b3300c",
+						Name:      "dashboard2",
+						Namespace: "blueberry",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
 					},
 				}, nil
 			},
@@ -305,8 +312,8 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":true}
 {"level":"INFO","msg":"Found all Grafana dashboards","dry":true,"count":2}
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":true,"count":1}
-{"level":"DEBUG","msg":"Skipping used dashboard","dry":true,"uid":"dashboard1","name":"Dashboard 1","reads":10,"users":2,"range":"24h0m0s"}
-{"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"dashboard2","name":"Dashboard 2"}
+{"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"3f02045e-5d94-4dbe-94e8-1353b1aede29","name":"dashboard1","namespace":"blueberry"}
+{"level":"INFO","msg":"Found unused dashboard, skipping deletion due to dry run","dry":true,"uid":"952e2e84-2515-4f7c-b965-151671b3300c","name":"dashboard2","namespace":"blueberry"}
 {"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":true,"deleted_count":0,"uids":""}
 `
 		assert.Equal(t, expectedLogs, logs.String())
@@ -381,14 +388,16 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			allDashboards: func(_ context.Context) ([]Dashboard, error) {
 				return []Dashboard{
 					{
-						UID:  "dashboard1",
-						Name: "Dashboard 1",
-						Spec: json.RawMessage(`{"title": "Dashboard 1"}`),
+						UID:       "dashboard1",
+						Name:      "Dashboard 1",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
 					},
 					{
-						UID:  "dashboard2",
-						Name: "Dashboard 2",
-						Spec: json.RawMessage(`{"title": "Dashboard 2"}`),
+						UID:       "dashboard2",
+						Name:      "Dashboard 2",
+						Namespace: "default",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
 					},
 				}, nil
 			},
@@ -423,17 +432,18 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false}
 {"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"count":2}
 {"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"count":0}
-{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"uid":"dashboard1","name":"Dashboard 1","namespace":"default","raw_json":"{\"title\": \"Dashboard 1\"}"}
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
 }
 
-func newMockDashboardReads(uid string, reads, users int) DashboardReads {
+func newMockDashboardReads(name string, reads, users int) DashboardReads {
 	return DashboardReads{
-		uid:   uid,
-		reads: reads,
-		users: users,
+		name:      name,
+		namespace: "default",
+		reads:     reads,
+		users:     users,
 	}
 }
 

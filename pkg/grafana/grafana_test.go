@@ -89,7 +89,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 					time.Now(),
 					"log message",
 					map[string]string{
-						"path":  "/api/dashboards/uid/dashboard1",
+						"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 						"uname": "user1",
 					},
 				),
@@ -125,10 +125,12 @@ func TestClient_UsedDashboards(t *testing.T) {
 					},
 				),
 			},
-			mockErr:         nil,
-			lowerThreshold:  1,
-			labels:          map[string]string{"app": "grafana"},
-			expectedErrText: `unexpected path format: "/invalid/path", expected format /api/dashboards/uid/:uid`,
+			mockErr:        nil,
+			lowerThreshold: 1,
+			labels:         map[string]string{"app": "grafana"},
+			expectedErrText: `extracting variables from path "/invalid/path": expected part count 8 but got 3: ` +
+				`unexpected path format: "/invalid/path", expected format ` +
+				`"/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"`,
 		},
 		"missing uname in stream labels": {
 			mockLogs: []loki.Log{
@@ -136,14 +138,15 @@ func TestClient_UsedDashboards(t *testing.T) {
 					time.Now(),
 					"log message",
 					map[string]string{
-						"path": "/api/dashboards/uid/dashboard1",
+						"path": "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					},
 				),
 			},
-			mockErr:         nil,
-			lowerThreshold:  1,
-			labels:          map[string]string{"app": "grafana"},
-			expectedErrText: "could not find uname in stream labels: map[path:/api/dashboards/uid/dashboard1]",
+			mockErr:        nil,
+			lowerThreshold: 1,
+			labels:         map[string]string{"app": "grafana"},
+			expectedErrText: "could not find uname in stream labels: " +
+				"map[path:/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1]",
 		},
 	}
 
@@ -182,7 +185,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 1",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard1",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					"uname": "user1",
 				},
 			),
@@ -190,7 +193,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 2",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard1",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					"uname": "user2",
 				},
 			),
@@ -198,7 +201,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 3",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard2",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard2",
 					"uname": "user1",
 				},
 			),
@@ -206,7 +209,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 4",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard1",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					"uname": "user1",
 				},
 			),
@@ -232,13 +235,76 @@ func TestClient_UsedDashboards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 2)
 
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 3, results[0].Reads())
 		assert.Equal(t, 2, results[0].Users())
 
-		assert.Equal(t, "dashboard2", results[1].UID())
+		assert.Equal(t, "dashboard2", results[1].Name())
+		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 1, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
+	})
+
+	t.Run("identically named dashboards in two different namespaces", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/orange/dashboards/dashboard1",
+					"uname": "user1",
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/orange/dashboards/dashboard1",
+					"uname": "user2",
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/blue/dashboards/dashboard1",
+					"uname": "user2",
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "apple",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+		}
+
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, "blue", results[0].Namespace())
+		assert.Equal(t, 1, results[0].Reads())
+		assert.Equal(t, 1, results[0].Users())
+
+		assert.Equal(t, "dashboard1", results[1].Name())
+		assert.Equal(t, "orange", results[1].Namespace())
+		assert.Equal(t, 2, results[1].Reads())
+		assert.Equal(t, 2, results[1].Users())
 	})
 
 	t.Run("ignores specified users", func(t *testing.T) {
@@ -249,7 +315,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 1",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard1",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					"uname": "user1",
 				},
 			),
@@ -257,7 +323,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 2",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard1",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 					"uname": "ignoredUser",
 				},
 			),
@@ -265,7 +331,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 3",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard2",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard2",
 					"uname": "ignoredUser",
 				},
 			),
@@ -273,7 +339,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 				time.Now(),
 				"log message 4",
 				map[string]string{
-					"path":  "/api/dashboards/uid/dashboard3",
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard3",
 					"uname": "user2",
 				},
 			),
@@ -300,11 +366,13 @@ func TestClient_UsedDashboards(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, results, 2) // dashboard2 should be excluded as it's only accessed by ignored user.
 
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 1, results[0].Reads()) // Only 1 read from non-ignored user.
 		assert.Equal(t, 1, results[0].Users()) // Only 1 unique non-ignored user.
 
-		assert.Equal(t, "dashboard3", results[1].UID())
+		assert.Equal(t, "dashboard3", results[1].Name())
+		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 1, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
 	})
@@ -318,7 +386,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 					time.Now(),
 					"log message 1",
 					map[string]string{
-						"path":  "/api/dashboards/uid/dashboard1",
+						"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
 						"uname": "user1",
 					},
 				),
@@ -326,7 +394,7 @@ func TestClient_UsedDashboards(t *testing.T) {
 					time.Now(),
 					"log message 2",
 					map[string]string{
-						"path":  "/api/dashboards/uid/dashboard2",
+						"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard2",
 						"uname": "user2",
 					},
 				),
@@ -354,11 +422,13 @@ func TestClient_UsedDashboards(t *testing.T) {
 		// In our mock, each chunk returns the same 2 logs, so with 5 chunks:
 		// - dashboard1 should have 5 reads from user1.
 		// - dashboard2 should have 5 reads from user2.
-		assert.Equal(t, "dashboard1", results[0].UID())
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, "default", results[0].Namespace())
 		assert.Equal(t, 5, results[0].Reads())
 		assert.Equal(t, 1, results[0].Users())
 
-		assert.Equal(t, "dashboard2", results[1].UID())
+		assert.Equal(t, "dashboard2", results[1].Name())
+		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 5, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
 	})

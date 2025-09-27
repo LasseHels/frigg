@@ -119,8 +119,12 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	var deletedUIDs []string
 
 	for _, dashboard := range all {
-		dashboardLogger := d.logger.With(slog.String("uid", dashboard.UID), slog.String("name", dashboard.Name))
-		usage, isUsed := usedDashboards[dashboard.UID]
+		dashboardLogger := d.logger.With(
+			slog.String("uid", dashboard.UID),
+			slog.String("name", dashboard.Name),
+			slog.String("namespace", dashboard.Namespace),
+		)
+		usage, isUsed := usedDashboards[dashboard.Key()]
 		if isUsed {
 			dashboardLogger.Debug(
 				"Skipping used dashboard",
@@ -137,7 +141,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 		}
 
 		dashboardLogger.Info("Deleting unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
-		if err := d.grafana.DeleteDashboard(ctx, dashboard.UID); err != nil {
+		if err := d.grafana.DeleteDashboard(ctx, dashboard.Name); err != nil {
 			return errors.Wrapf(err, "deleting unused dashboard %s", dashboard.UID)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
@@ -153,11 +157,11 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	return nil
 }
 
-func (d *DashboardPruner) usedMap(used []DashboardReads) map[string]DashboardReads {
-	m := make(map[string]DashboardReads, len(used))
+func (d *DashboardPruner) usedMap(used []DashboardReads) map[DashboardKey]DashboardReads {
+	m := make(map[DashboardKey]DashboardReads, len(used))
 
 	for _, u := range used {
-		m[u.UID()] = u
+		m[u.Key()] = u
 	}
 
 	return m
