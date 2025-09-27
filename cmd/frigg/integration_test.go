@@ -53,11 +53,11 @@ func TestFriggIntegration(t *testing.T) {
 		assert.Contains(t, body, "process_", "Metrics should contain process metrics")
 	})
 
-	// TODO: Test dashboard that was read by ignored user.
 	t.Run("prunes dashboards", func(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			grafana.AssertDashboardDoesNotExist(collect, apiKey, "unuseddashboard")
 			grafana.AssertDashboardExists(collect, apiKey, "useddashboard")
+			grafana.AssertDashboardDoesNotExist(collect, apiKey, "ignoreduserdashboard")
 		}, time.Second*10, time.Millisecond*100)
 	})
 
@@ -66,6 +66,28 @@ func TestFriggIntegration(t *testing.T) {
 	assert.Contains(t, logs, fmt.Sprintf("Loading secrets file from path %s\n", secretsPath))
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/health","methods":["GET"]`)
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/metrics","methods":["GET"]`)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"uid":`+
+			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard","namespace":"default",`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
+			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"ignoreduserdashboard\"}"}`,
+	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"uid":`+
+			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard","namespace":"default",`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
+			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"unuseddashboard\"}"}`,
+	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,`+
+			`"deleted_count":2,"deleted_dashboards":"default/ignoreduserdashboard, default/unuseddashboard"}`,
+	)
 
 	t.Run("shuts down gracefully", func(t *testing.T) {
 		cancel()
@@ -93,6 +115,7 @@ func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
 	)
 
 	apiKey := grafana.CreateAPIKey(t, "test-key")
+	ignoredKey := grafana.CreateAPIKey(t, "john-doe")
 
 	secrets := fmt.Sprintf(`
 grafana:
@@ -104,9 +127,12 @@ grafana:
 
 	grafana.CreateDashboard(t, apiKey, "useddashboard")
 	grafana.CreateDashboard(t, apiKey, "unuseddashboard")
+	grafana.CreateDashboard(t, apiKey, "ignoreduserdashboard")
 
 	// Assert that the dashboard exists to create a read log entry in Loki.
 	grafana.AssertDashboardExists(t, apiKey, "useddashboard")
+	// Create a log entry in Loki for the ignored user.
+	grafana.AssertDashboardExists(t, ignoredKey, "ignoreduserdashboard")
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
