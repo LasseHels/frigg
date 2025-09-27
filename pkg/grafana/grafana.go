@@ -142,7 +142,6 @@ func (d *DashboardReads) Key() DashboardKey {
 }
 
 // DashboardKey uniquely identifies a dashboard in Grafana by its combined name and namespace.
-// TODO: Make this into a slog attribute?
 type DashboardKey struct {
 	name      string
 	namespace string
