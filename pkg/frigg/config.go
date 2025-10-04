@@ -140,6 +140,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
 		Grafana:        grafanaClient,
 		Logger:         logger,
+		Namespace:      "default",
 		Interval:       c.Prune.Interval,
 		IgnoredUsers:   c.Prune.IgnoredUsers,
 		Period:         c.Prune.Period,

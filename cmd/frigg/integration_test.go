@@ -69,7 +69,7 @@ func TestFriggIntegration(t *testing.T) {
 	assert.Contains(
 		t,
 		logs,
-		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"uid":`+
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
 			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard","namespace":"default",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"ignoreduserdashboard\"}"}`,
@@ -77,7 +77,7 @@ func TestFriggIntegration(t *testing.T) {
 	assert.Contains(
 		t,
 		logs,
-		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"uid":`+
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
 			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard","namespace":"default",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"unuseddashboard\"}"}`,
@@ -85,7 +85,7 @@ func TestFriggIntegration(t *testing.T) {
 	assert.Contains(
 		t,
 		logs,
-		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,`+
+		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"default",`+
 			`"deleted_count":2,"deleted_dashboards":"default/ignoreduserdashboard, default/unuseddashboard"}`,
 	)
 
