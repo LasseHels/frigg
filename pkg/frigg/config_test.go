@@ -50,6 +50,7 @@ func TestNewConfig(t *testing.T) {
 				},
 				Prune: grafana.PruneConfig{
 					Dry:          false,
+					Namespaces:   []string{"default"},
 					Interval:     5 * time.Minute,
 					IgnoredUsers: []string{"admin"},
 					Period:       720 * time.Hour,
@@ -79,9 +80,10 @@ func TestNewConfig(t *testing.T) {
 					Endpoint: "http://example.com",
 				},
 				Prune: grafana.PruneConfig{
-					Dry:      true,
-					Interval: 10 * time.Minute,
-					Period:   720 * time.Hour,
+					Dry:        true,
+					Namespaces: []string{"default"},
+					Interval:   10 * time.Minute,
+					Period:     720 * time.Hour,
 					Labels: map[string]string{
 						"app": "grafana",
 					},
@@ -107,9 +109,10 @@ func TestNewConfig(t *testing.T) {
 					Endpoint: "http://example.com",
 				},
 				Prune: grafana.PruneConfig{
-					Dry:      true,
-					Interval: 10 * time.Minute,
-					Period:   720 * time.Hour,
+					Dry:        true,
+					Namespaces: []string{"default"},
+					Interval:   10 * time.Minute,
+					Period:     720 * time.Hour,
 					Labels: map[string]string{
 						"app": "grafana",
 					},
@@ -179,25 +182,89 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/invalid_prune_interval.yaml",
 			expectedConfig: nil,
 			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
-				`  line 10: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
+				`  line 12: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune period": {
 			configPath:     "testdata/invalid_prune_period.yaml",
 			expectedConfig: nil,
 			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
-				`  line 13: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
+				`  line 15: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune lower threshold": {
 			configPath:     "testdata/invalid_prune_lower_threshold.yaml",
 			expectedConfig: nil,
 			expectedError: "loading configuration: parsing config file: yaml: unmarshal " +
-				"errors:\n  line 23: cannot unmarshal !!str `nope` into int",
+				"errors:\n  line 25: cannot unmarshal !!str `nope` into int",
 		},
 		"negative prune lower threshold": {
 			configPath:     "testdata/negative_prune_lower_threshold.yaml",
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Prune.LowerThreshold' " +
 				"Error:Field validation for 'LowerThreshold' failed on the 'min' tag",
+		},
+		"missing prune namespaces": {
+			configPath: "testdata/missing_prune_namespaces.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:        true,
+					Namespaces: []string{"default"},
+					Interval:   10 * time.Minute,
+					Period:     720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+					},
+					LowerThreshold: 10,
+				},
+			},
+			expectedError: "",
+		},
+		"empty prune namespaces": {
+			configPath:     "testdata/empty_prune_namespaces.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces' Error:" +
+				"Field validation for 'Namespaces' failed on the 'min' tag",
+		},
+		"multiple namespaces": {
+			configPath: "testdata/multiple_namespaces_config.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:        true,
+					Namespaces: []string{"default", "production", "staging"},
+					Interval:   10 * time.Minute,
+					Period:     720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+					},
+					LowerThreshold: 10,
+				},
+			},
+			expectedError: "",
 		},
 	}
 
@@ -233,9 +300,10 @@ func TestNewConfig(t *testing.T) {
 				Endpoint: "http://example.com",
 			},
 			Prune: grafana.PruneConfig{
-				Dry:      true,
-				Interval: 10 * time.Minute,
-				Period:   720 * time.Hour,
+				Dry:        true,
+				Namespaces: []string{"default"},
+				Interval:   10 * time.Minute,
+				Period:     720 * time.Hour,
 				Labels: map[string]string{
 					"app": "grafana",
 				},

@@ -1,21 +1,20 @@
 server:
-  host: pomelo.com
-  port: 9898
-
-log:
-  level: ERROR
+  host: localhost
+  port: 8080
 
 loki:
   endpoint: 'http://loki.example.com'
 
+grafana:
+  endpoint: 'http://example.com'
+
 prune:
-  dry: false
+  dry: true
   namespaces:
     - default
-  interval: '5m'
-  ignored_users:
-    - 'admin'
+    - production
+    - staging
+  interval: '10m'
   period: '720h'
   labels:
     app: 'grafana'
-    env: 'test'

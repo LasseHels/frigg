@@ -6,6 +6,8 @@ grafana:
 
 prune:
   dry: true
+  namespaces:
+    - default
   interval: '10m'
   period: '720h'
   labels:

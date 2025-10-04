@@ -9,6 +9,8 @@ grafana:
 
 prune:
   dry: false
+  namespaces:
+    - default
   interval: '1s'
   period: '10m'
   ignored_users:
