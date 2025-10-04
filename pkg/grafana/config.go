@@ -8,6 +8,7 @@ type Config struct {
 
 type PruneConfig struct {
 	Dry            bool              `yaml:"dry"`
+	Namespaces     []string          `yaml:"namespaces" validate:"required,min=1,dive,required"`
 	Interval       time.Duration     `yaml:"interval"`
 	IgnoredUsers   []string          `yaml:"ignored_users"`
 	Period         time.Duration     `yaml:"period" validate:"required"`

@@ -13,6 +13,8 @@ grafana:
 
 prune:
   dry: true
+  namespaces:
+    - default
   interval: '10m'
   ignored_users:
     - 'some-admin'

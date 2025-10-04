@@ -75,6 +75,7 @@ func (c *Config) defaults() {
 	c.Server.Host = "localhost"
 	c.Server.Port = 8080
 	c.Prune.Dry = true
+	c.Prune.Namespaces = []string{"default"}
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
 }
