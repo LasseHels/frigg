@@ -43,7 +43,7 @@ prune:
   # Grafana namespaces in which to search for unused dashboards.
   # See https://grafana.com/docs/grafana/v12.1/developers/http_api/apis/#namespace-namespace.
   #
-  # If specified, the array may not be empty and items may not be empty strings (default: ["default"]).
+  # If specified, the array may not be empty, and items may not be empty strings (default: ["default"]).
   namespaces:
     - default
   # The interval with which the dashboard pruner will search for unused dashboards.
