@@ -17,13 +17,14 @@ type grafanaClient interface {
 		r time.Duration,
 		opts UsedDashboardsOptions,
 	) ([]DashboardReads, error)
-	AllDashboards(ctx context.Context) ([]Dashboard, error)
-	DeleteDashboard(ctx context.Context, uid string) error
+	AllDashboards(ctx context.Context, namespace string) ([]Dashboard, error)
+	DeleteDashboard(ctx context.Context, namespace string, uid string) error
 }
 
 type DashboardPruner struct {
 	grafana        grafanaClient
 	logger         *slog.Logger
+	namespace      string
 	interval       time.Duration
 	ignoredUsers   []string
 	period         time.Duration
@@ -35,6 +36,8 @@ type DashboardPruner struct {
 type NewDashboardPrunerOptions struct {
 	Grafana grafanaClient
 	Logger  *slog.Logger
+	// Namespace in which to prune dashboards.
+	Namespace string
 	// Interval with which to prune dashboards.
 	Interval time.Duration
 	// IgnoredUsers whose reads do not count toward the usage of a dashboard.
@@ -56,11 +59,15 @@ type NewDashboardPrunerOptions struct {
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
-	logger := opts.Logger.With(slog.Bool("dry", opts.Dry))
+	logger := opts.Logger.With(
+		slog.Bool("dry", opts.Dry),
+		slog.String("namespace", opts.Namespace),
+	)
 
 	return &DashboardPruner{
 		grafana:        opts.Grafana,
 		logger:         logger,
+		namespace:      opts.Namespace,
 		interval:       opts.Interval,
 		ignoredUsers:   opts.IgnoredUsers,
 		period:         opts.Period,
@@ -99,7 +106,7 @@ func (d *DashboardPruner) tick(ctx context.Context) {
 func (d *DashboardPruner) prune(ctx context.Context) error {
 	d.logger.Info("Pruning Grafana dashboards")
 
-	all, err := d.grafana.AllDashboards(ctx)
+	all, err := d.grafana.AllDashboards(ctx, d.namespace)
 	if err != nil {
 		return errors.Wrap(err, "fetching all Grafana dashboards")
 	}
@@ -142,7 +149,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 		}
 
 		dashboardLogger.Info("Deleting unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
-		if err := d.grafana.DeleteDashboard(ctx, dashboard.Name); err != nil {
+		if err := d.grafana.DeleteDashboard(ctx, dashboard.Namespace, dashboard.Name); err != nil {
 			return errors.Wrapf(err, "deleting unused dashboard %s", dashboard.UID)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))

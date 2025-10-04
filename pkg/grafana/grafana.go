@@ -370,19 +370,19 @@ type dashboardItemMetadata struct {
 	CreationTimestamp time.Time `json:"creationTimestamp"`
 }
 
-// AllDashboards returns all dashboards from the Grafana instance.
+// AllDashboards returns all dashboards from the specified namespace in the Grafana instance.
 //
 // AllDashboards uses the Grafana HTTP API endpoint "List dashboards" to fetch all dashboards.
 // See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#list-dashboards.
 //
 // AllDashboards handles pagination automatically and fetches all pages.
-func (c *Client) AllDashboards(ctx context.Context) ([]Dashboard, error) {
+func (c *Client) AllDashboards(ctx context.Context, namespace string) ([]Dashboard, error) {
 	var allDashboards []Dashboard
 	pageSize := 500
 	continueToken := ""
 
 	for {
-		dashboards, nextContinueToken, err := c.dashboardsPage(ctx, pageSize, continueToken)
+		dashboards, nextContinueToken, err := c.dashboardsPage(ctx, namespace, pageSize, continueToken)
 		if err != nil {
 			return nil, errors.Wrap(err, "getting dashboards page")
 		}
@@ -400,8 +400,13 @@ func (c *Client) AllDashboards(ctx context.Context) ([]Dashboard, error) {
 }
 
 // dashboardsPage fetches a single page of dashboard results from the Grafana API.
-func (c *Client) dashboardsPage(ctx context.Context, limit int, continueToken string) ([]Dashboard, string, error) {
-	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", "default", "dashboards")
+func (c *Client) dashboardsPage(
+	ctx context.Context,
+	namespace string,
+	limit int,
+	continueToken string,
+) ([]Dashboard, string, error) {
+	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", namespace, "dashboards")
 
 	q := u.Query()
 	q.Set("limit", fmt.Sprintf("%d", limit))
@@ -465,13 +470,12 @@ type deleteDashboardResponse struct {
 // /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid to delete a dashboard in Grafana v12.
 //
 // See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#delete-dashboard.
-func (c *Client) DeleteDashboard(ctx context.Context, uid string) error {
+func (c *Client) DeleteDashboard(ctx context.Context, namespace, uid string) error {
 	if uid == "" {
 		return errors.New("dashboard UID must not be empty")
 	}
 
-	// TODO: Ability to delete in other namespaces than default.
-	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", "default", "dashboards", uid)
+	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", namespace, "dashboards", uid)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), http.NoBody)
 	if err != nil {

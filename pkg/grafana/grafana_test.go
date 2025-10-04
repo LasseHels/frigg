@@ -462,7 +462,7 @@ func TestClient_AllDashboards(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		dashboards, err := g.AllDashboards(t.Context())
+		dashboards, err := g.AllDashboards(t.Context(), "default")
 		require.EqualError(t, err, "getting dashboards page: unexpected status code: 500, body: the server is down")
 		assert.Nil(t, dashboards)
 		assert.Equal(t, 1, requestCount)
@@ -486,7 +486,7 @@ func TestClient_AllDashboards(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		dashboards, err := g.AllDashboards(t.Context())
+		dashboards, err := g.AllDashboards(t.Context(), "default")
 		require.EqualError(
 			t,
 			err,
@@ -583,7 +583,7 @@ func TestClient_AllDashboards(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		dashboards, err := g.AllDashboards(t.Context())
+		dashboards, err := g.AllDashboards(t.Context(), "default")
 		require.NoError(t, err)
 		require.Len(t, dashboards, 2)
 
@@ -697,7 +697,7 @@ func TestClient_AllDashboards(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		dashboards, err := g.AllDashboards(t.Context())
+		dashboards, err := g.AllDashboards(t.Context(), "default")
 		require.NoError(t, err)
 		require.Len(t, dashboards, 2)
 
@@ -727,7 +727,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "")
+		err = g.DeleteDashboard(t.Context(), "default", "")
 		require.EqualError(t, err, "dashboard UID must not be empty")
 	})
 
@@ -749,7 +749,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
 		require.EqualError(t, err, "unexpected status code: 500, body: server error")
 	})
 
@@ -771,7 +771,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
 		require.EqualError(
 			t,
 			err,
@@ -808,7 +808,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
 		require.EqualError(
 			t,
 			err,
@@ -849,7 +849,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
 		require.NoError(t, err)
 		assert.Equal(t, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard-uid", request.URL.Path)
 		assert.Equal(t, "Bearer abc123", request.Header.Get("Authorization"))
@@ -879,7 +879,7 @@ func TestClient_DeleteDashboard(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
 		require.ErrorContains(t, err, "making request to Grafana")
 		require.ErrorContains(t, err, "simulated client error")
 	})
