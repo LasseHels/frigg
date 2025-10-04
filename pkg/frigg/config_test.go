@@ -237,6 +237,12 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces' Error:" +
 				"Field validation for 'Namespaces' failed on the 'min' tag",
 		},
+		"empty string namespaces": {
+			configPath:     "testdata/empty_string_namespaces.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces[0]' Error:" +
+				"Field validation for 'Namespaces[0]' failed on the 'required' tag",
+		},
 	}
 
 	for name, tt := range tests {

@@ -1,0 +1,17 @@
+server:
+  host: localhost
+  port: 8080
+
+loki:
+  endpoint: 'http://loki.example.com'
+
+grafana:
+  endpoint: 'http://example.com'
+
+prune:
+  dry: true
+  namespaces: [""]
+  interval: '10m'
+  period: '720h'
+  labels:
+    app: 'grafana'
