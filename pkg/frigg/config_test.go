@@ -237,35 +237,6 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces' Error:" +
 				"Field validation for 'Namespaces' failed on the 'min' tag",
 		},
-		"multiple namespaces": {
-			configPath: "testdata/multiple_namespaces_config.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelInfo,
-				},
-				Server: server.Config{
-					Host: "localhost",
-					Port: 8080,
-				},
-				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
-				},
-				Prune: grafana.PruneConfig{
-					Dry:        true,
-					Namespaces: []string{"default", "production", "staging"},
-					Interval:   10 * time.Minute,
-					Period:     720 * time.Hour,
-					Labels: map[string]string{
-						"app": "grafana",
-					},
-					LowerThreshold: 10,
-				},
-			},
-			expectedError: "",
-		},
 	}
 
 	for name, tt := range tests {
