@@ -138,19 +138,25 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		return nil, errors.Wrap(err, "creating Grafana client")
 	}
 
-	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
-		Grafana:        grafanaClient,
-		Logger:         logger,
-		Namespace:      "default",
-		Interval:       c.Prune.Interval,
-		IgnoredUsers:   c.Prune.IgnoredUsers,
-		Period:         c.Prune.Period,
-		Labels:         c.Prune.Labels,
-		Dry:            c.Prune.Dry,
-		LowerThreshold: c.Prune.LowerThreshold,
-	})
+	f := New(logger, s, gatherer)
 
-	return New(logger, s, gatherer, pruner), nil
+	for _, ns := range c.Prune.Namespaces {
+		pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
+			Grafana:        grafanaClient,
+			Logger:         logger,
+			Namespace:      ns,
+			Interval:       c.Prune.Interval,
+			IgnoredUsers:   c.Prune.IgnoredUsers,
+			Period:         c.Prune.Period,
+			Labels:         c.Prune.Labels,
+			Dry:            c.Prune.Dry,
+			LowerThreshold: c.Prune.LowerThreshold,
+		})
+
+		f.AddPruner(pruner)
+	}
+
+	return f, nil
 }
 
 // validate ensures the configuration is valid.

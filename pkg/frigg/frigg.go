@@ -12,7 +12,7 @@ import (
 	"github.com/LasseHels/frigg/pkg/server"
 )
 
-type dashboardPruner interface {
+type starter interface {
 	Start(ctx context.Context)
 }
 
@@ -20,15 +20,14 @@ type Frigg struct {
 	logger   *slog.Logger
 	server   *server.Server
 	gatherer prometheus.Gatherer
-	pruner   dashboardPruner
+	pruners  []starter
 }
 
-func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pruner dashboardPruner) *Frigg {
+func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer) *Frigg {
 	return &Frigg{
 		logger:   logger,
 		server:   s,
 		gatherer: gatherer,
-		pruner:   pruner,
 	}
 }
 
@@ -38,7 +37,9 @@ func (f *Frigg) Start(ctx context.Context) error {
 
 	f.registerRoutes()
 
-	go f.pruner.Start(ctx)
+	for _, p := range f.pruners {
+		p.Start(ctx)
+	}
 
 	if err := f.server.Start(); err != nil {
 		return errors.Wrap(err, "starting server")
@@ -56,6 +57,10 @@ func (f *Frigg) Stop() error {
 
 	f.logger.Info("Stopped Frigg")
 	return nil
+}
+
+func (f *Frigg) AddPruner(p starter) {
+	f.pruners = append(f.pruners, p)
 }
 
 func (f *Frigg) registerRoutes() {
