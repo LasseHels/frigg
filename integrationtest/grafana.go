@@ -76,7 +76,7 @@ func (g *Grafana) Host() string {
 }
 
 // CreateAPIKey creates a Grafana API key with admin permissions using the service account API.
-func (g *Grafana) CreateAPIKey(t *testing.T, name string) string {
+func (g *Grafana) CreateAPIKey(t *testing.T, name string, orgID int) string {
 	t.Helper()
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/serviceaccount/#create-service-account.
 	serviceAccountURL := fmt.Sprintf("http://%s/api/serviceaccounts", g.host)
@@ -93,22 +93,18 @@ func (g *Grafana) CreateAPIKey(t *testing.T, name string) string {
 	require.NoError(t, err)
 
 	req.Header.Set("Content-Type", "application/json")
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/#x-grafana-org-id-header.
+	req.Header.Set("X-Grafana-Org-Id", fmt.Sprintf("%d", orgID))
 	req.SetBasicAuth("admin", "admin")
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, resp.Body.Close())
-	}()
-
-	require.Equal(t, http.StatusCreated, resp.StatusCode)
+	body := do(t, req, http.StatusCreated)
 
 	var serviceAccountResult struct {
-		ID int64 `json:"id"`
+		ID    int64 `json:"id"`
+		OrgID int64 `json:"orgId"`
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&serviceAccountResult)
+	err = json.Unmarshal(body, &serviceAccountResult)
 	require.NoError(t, err)
 
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/serviceaccount/#create-service-account-tokens.
@@ -125,31 +121,52 @@ func (g *Grafana) CreateAPIKey(t *testing.T, name string) string {
 	require.NoError(t, err)
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Grafana-Org-Id", fmt.Sprintf("%d", orgID))
 	req.SetBasicAuth("admin", "admin")
 
-	resp, err = client.Do(req)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, resp.Body.Close())
-	}()
-
-	require.Equal(t, http.StatusOK, resp.StatusCode)
+	body = do(t, req, http.StatusOK)
 
 	var tokenResult struct {
 		Key string `json:"key"`
 	}
 
-	err = json.NewDecoder(resp.Body).Decode(&tokenResult)
+	err = json.Unmarshal(body, &tokenResult)
 	require.NoError(t, err)
 
 	return tokenResult.Key
 }
 
+// CreateOrganisation creates a new organisation in Grafana. CreateOrganisation returns the ID of the new organisation.
+func (g *Grafana) CreateOrganisation(t *testing.T, name string) int {
+	t.Helper()
+
+	// https://grafana.com/docs/grafana/v12.0/developers/http_api/org/#create-organization.
+	url := fmt.Sprintf("http://%s/api/orgs", g.host)
+
+	payload := []byte(fmt.Sprintf(`{"name": %q}`, name))
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewBuffer(payload))
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth("admin", "admin")
+
+	body := do(t, req, http.StatusOK)
+	var result struct {
+		OrgID int `json:"orgId"`
+	}
+
+	err = json.Unmarshal(body, &result)
+	require.NoError(t, err)
+
+	return result.OrgID
+}
+
 // CreateDashboard in Grafana using the traditional HTTP API.
-func (g *Grafana) CreateDashboard(t *testing.T, apiKey, name string) {
+func (g *Grafana) CreateDashboard(t *testing.T, apiKey, namespace, name string) {
 	t.Helper()
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#create-dashboard.
-	url := fmt.Sprintf("http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards", g.host)
+	url := fmt.Sprintf("http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/%s/dashboards", g.host, namespace)
 
 	payload := []byte(fmt.Sprintf(`
 {
@@ -177,44 +194,43 @@ func (g *Grafana) CreateDashboard(t *testing.T, apiKey, name string) {
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	require.NoError(t, err)
-	defer func() {
-		require.NoError(t, resp.Body.Close())
-	}()
-	body, err := io.ReadAll(resp.Body)
-	require.NoError(t, err)
-
-	require.Equal(t, http.StatusCreated, resp.StatusCode, string(body))
+	_ = do(t, req, http.StatusCreated)
 }
 
-func (g *Grafana) AssertDashboardExists(t assert.TestingT, apiKey, name string) {
-	g.assertGetDashboardStatusCode(t, apiKey, name, http.StatusOK)
+func (g *Grafana) AssertDashboardExists(t assert.TestingT, apiKey, namespace, name string) {
+	g.assertGetDashboardStatusCode(t, apiKey, namespace, name, http.StatusOK)
 }
 
-func (g *Grafana) AssertDashboardDoesNotExist(t assert.TestingT, apiKey, name string) {
-	g.assertGetDashboardStatusCode(t, apiKey, name, http.StatusNotFound)
+func (g *Grafana) AssertDashboardDoesNotExist(t assert.TestingT, apiKey, namespace, name string) {
+	g.assertGetDashboardStatusCode(t, apiKey, namespace, name, http.StatusNotFound)
 }
 
-func (g *Grafana) assertGetDashboardStatusCode(t assert.TestingT, apiKey, name string, expectedStatusCode int) {
-	statusCode := g.getDashboard(t, apiKey, name)
+func (g *Grafana) assertGetDashboardStatusCode(
+	t assert.TestingT,
+	apiKey,
+	namespace,
+	name string,
+	expectedStatusCode int,
+) {
+	statusCode := g.getDashboard(t, apiKey, namespace, name)
 	assert.Equal(
 		t,
 		expectedStatusCode,
 		statusCode,
-		"expected code %d when retrieving dashboard with name %q",
+		"expected code %d when retrieving dashboard with name %q in namespace %q",
 		expectedStatusCode,
 		name,
+		namespace,
 	)
 }
 
 // getDashboard by name using the traditional HTTP API.
-func (g *Grafana) getDashboard(t assert.TestingT, apiKey, name string) int {
+func (g *Grafana) getDashboard(t assert.TestingT, apiKey, namespace, name string) int {
 	// https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#get-dashboard.
 	url := fmt.Sprintf(
-		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/%s",
+		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/%s/dashboards/%s",
 		g.host,
+		namespace,
 		name,
 	)
 
@@ -226,12 +242,25 @@ func (g *Grafana) getDashboard(t assert.TestingT, apiKey, name string) int {
 
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
 
-	client := &http.Client{}
-	resp, err := client.Do(req)
+	resp, err := http.DefaultClient.Do(req)
 	assert.NoError(t, err) //nolint:testifylint
 	defer func() {
 		assert.NoError(t, resp.Body.Close())
 	}()
 
 	return resp.StatusCode
+}
+
+func do(t testing.TB, req *http.Request, expectedStatus int) []byte {
+	t.Helper()
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer func() {
+		require.NoError(t, resp.Body.Close())
+	}()
+	body, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equal(t, expectedStatus, resp.StatusCode, string(body))
+
+	return body
 }

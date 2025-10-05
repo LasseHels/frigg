@@ -55,9 +55,10 @@ func TestFriggIntegration(t *testing.T) {
 
 	t.Run("prunes dashboards", func(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			grafana.AssertDashboardDoesNotExist(collect, apiKey, "unuseddashboard")
-			grafana.AssertDashboardExists(collect, apiKey, "useddashboard")
-			grafana.AssertDashboardDoesNotExist(collect, apiKey, "ignoreduserdashboard")
+			grafana.AssertDashboardDoesNotExist(collect, apiKey, "default", "unuseddashboard")
+			grafana.AssertDashboardExists(collect, apiKey, "default", "useddashboard")
+			grafana.AssertDashboardDoesNotExist(collect, apiKey, "default", "ignoreduserdashboard")
+			grafana.AssertDashboardDoesNotExist(collect, apiKey, "purple", "purpleunuseddashboard")
 		}, time.Second*10, time.Millisecond*100)
 	})
 
@@ -88,6 +89,20 @@ func TestFriggIntegration(t *testing.T) {
 		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"default",`+
 			`"deleted_count":2,"deleted_dashboards":"default/ignoreduserdashboard, default/unuseddashboard"}`,
 	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"purple","uid":`+
+			`"L3SWgJN1gDGfNzW3I1jKn4uFt0xQVZtKnI1uQwDr6DEX","name":"purpleunuseddashboard","namespace":"purple",`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
+			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"purpleunuseddashboard\"}"}`,
+	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"purple",`+
+			`"deleted_count":1,"deleted_dashboards":"purple/purpleunuseddashboard"}`,
+	)
 
 	t.Run("shuts down gracefully", func(t *testing.T) {
 		cancel()
@@ -107,16 +122,28 @@ func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
 			loki: loki,
 			t:    t,
 			timestamps: map[string]time.Time{
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/useddashboard":        now.Add(-5 * time.Minute),
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/ignoreduserdashboard": now.Add(-5 * time.Minute),
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/unuseddashboard":      now.Add(-15 * time.Minute), //nolint:lll
+				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/useddashboard": now.Add(
+					-5 * time.Minute,
+				),
+				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/ignoreduserdashboard": now.Add(
+					-5 * time.Minute,
+				),
+				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/unuseddashboard": now.Add(
+					-15 * time.Minute,
+				),
+				"/apis/dashboard.grafana.app/v1beta1/namespaces/purple/dashboards/purpleunuseddashboard": now.Add(
+					-15 * time.Minute,
+				),
 			},
 		},
 	)
 
-	apiKey := grafana.CreateAPIKey(t, "test-key")
-	ignoredKey := grafana.CreateAPIKey(t, "john-doe")
+	id := grafana.CreateOrganisation(t, "purple")
+	apiKey := grafana.CreateAPIKey(t, "test-key", 1)
+	ignoredKey := grafana.CreateAPIKey(t, "john-doe", 1)
+	_ = grafana.CreateAPIKey(t, "purple-key", id)
 
+	// TODO: Ability to specify multiple tokens; one for each namespace.
 	secrets := fmt.Sprintf(`
 grafana:
   token: %s
@@ -125,14 +152,15 @@ grafana:
 	err := os.WriteFile(secretsPath, []byte(secrets), os.ModePerm)
 	require.NoError(t, err)
 
-	grafana.CreateDashboard(t, apiKey, "useddashboard")
-	grafana.CreateDashboard(t, apiKey, "unuseddashboard")
-	grafana.CreateDashboard(t, apiKey, "ignoreduserdashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "useddashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "unuseddashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
+	grafana.CreateDashboard(t, apiKey, "purple", "purpleunuseddashboard")
 
 	// Assert that the dashboard exists to create a read log entry in Loki.
-	grafana.AssertDashboardExists(t, apiKey, "useddashboard")
+	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboard")
 	// Create a log entry in Loki for the ignored user.
-	grafana.AssertDashboardExists(t, ignoredKey, "ignoreduserdashboard")
+	grafana.AssertDashboardExists(t, ignoredKey, "default", "ignoreduserdashboard")
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
