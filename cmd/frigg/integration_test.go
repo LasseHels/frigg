@@ -119,7 +119,8 @@ func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
 
 	secrets := fmt.Sprintf(`
 grafana:
-  token: %s
+  tokens:
+    default: %s
 `, apiKey)
 	secretsPath := filepath.Join(t.TempDir(), "secrets.yaml")
 	err := os.WriteFile(secretsPath, []byte(secrets), os.ModePerm)

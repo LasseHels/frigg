@@ -10,8 +10,6 @@ loki:
 
 prune:
   dry: false
-  namespaces:
-    - default
   interval: '5m'
   ignored_users:
     - 'admin'

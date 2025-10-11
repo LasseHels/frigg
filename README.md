@@ -40,12 +40,6 @@ grafana:
 prune:
   # If dry is set to true, the dashboard pruner will only log unused dashboards instead of deleting them (default: true).
   dry: true
-  # Grafana namespaces in which to search for unused dashboards.
-  # See https://grafana.com/docs/grafana/v12.1/developers/http_api/apis/#namespace-namespace.
-  #
-  # If specified, the array may not be empty, and items may not be empty strings (default: ["default"]).
-  namespaces:
-    - default
   # The interval with which the dashboard pruner will search for unused dashboards.
   # Regardless of the value of interval, the dashboard pruner will always run once immediately after Frigg has started.
   # This value must be a valid Go duration string (default: "10m").
@@ -89,11 +83,22 @@ prune:
 
 ```yaml
 grafana:
-    # Token used to authenticate with Grafana's API.
-    # This token must have permissions to list and delete dashboards.
+    # Tokens used to authenticate with Grafana's API for specific namespaces. This field is a map where keys are
+    # namespace names and values are the token used to authenticate with Grafana's API for that namespace. A namespace's
+    # token is expected to have permissions to list and delete dashboards in that namespace.
+    #
+    # This field also controls which namespaces Frigg will prune and which it will ignore; Frigg will only prune
+    # namespaces that have an entry in this map.
+    #
+    # See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#namespace-namespace.
+    #
+    # The map must contain at least one namespace.
     #
     # Required.
-    token: 'your-grafana-api-token-here'
+    tokens:
+        default: 'token-for-the-default-namespace'
+        org-1: 'token-for-the-org-1-namespace'
+        stacks-5: 'token-for-the-stacks-5-namespace'
 ```
 
 ### Environment Variable Expansion

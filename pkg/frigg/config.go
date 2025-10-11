@@ -75,7 +75,6 @@ func (c *Config) defaults() {
 	c.Server.Host = "localhost"
 	c.Server.Port = 8080
 	c.Prune.Dry = true
-	c.Prune.Namespaces = []string{"default"}
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
 }
@@ -127,30 +126,34 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 
 	grafanaURL := mustParseURL(c.Grafana.Endpoint)
 
-	grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
-		Logger:     logger,
-		Client:     lokiClient,
-		HTTPClient: httpClient,
-		Endpoint:   *grafanaURL,
-		Token:      secrets.Grafana.Token,
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "creating Grafana client")
+	var pruners []dashboardPruner
+	for namespace, token := range secrets.Grafana.Tokens {
+		grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     logger,
+			Client:     lokiClient,
+			HTTPClient: httpClient,
+			Endpoint:   *grafanaURL,
+			Token:      token,
+		})
+		if err != nil {
+			return nil, errors.Wrapf(err, "creating Grafana client for namespace %s", namespace)
+		}
+
+		pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
+			Grafana:        grafanaClient,
+			Logger:         logger,
+			Namespace:      namespace,
+			Interval:       c.Prune.Interval,
+			IgnoredUsers:   c.Prune.IgnoredUsers,
+			Period:         c.Prune.Period,
+			Labels:         c.Prune.Labels,
+			Dry:            c.Prune.Dry,
+			LowerThreshold: c.Prune.LowerThreshold,
+		})
+		pruners = append(pruners, pruner)
 	}
 
-	pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
-		Grafana:        grafanaClient,
-		Logger:         logger,
-		Namespace:      "default",
-		Interval:       c.Prune.Interval,
-		IgnoredUsers:   c.Prune.IgnoredUsers,
-		Period:         c.Prune.Period,
-		Labels:         c.Prune.Labels,
-		Dry:            c.Prune.Dry,
-		LowerThreshold: c.Prune.LowerThreshold,
-	})
-
-	return New(logger, s, gatherer, pruner), nil
+	return New(logger, s, gatherer, pruners), nil
 }
 
 // validate ensures the configuration is valid.
