@@ -296,6 +296,18 @@ func TestNewSecrets(t *testing.T) {
 			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens' Error:" +
 				"Field validation for 'Tokens' failed on the 'min' tag",
 		},
+		"empty key in tokens map": {
+			secretsPath:     "testdata/empty_key_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens[]' Error:" +
+				"Field validation for 'Tokens[]' failed on the 'required' tag",
+		},
+		"empty value in tokens map": {
+			secretsPath:     "testdata/empty_value_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens[default]' Error:" +
+				"Field validation for 'Tokens[default]' failed on the 'required' tag",
+		},
 	}
 
 	for name, tt := range tests {
