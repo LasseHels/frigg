@@ -50,7 +50,6 @@ func TestNewConfig(t *testing.T) {
 				},
 				Prune: grafana.PruneConfig{
 					Dry:          false,
-					Namespaces:   []string{"default"},
 					Interval:     5 * time.Minute,
 					IgnoredUsers: []string{"admin"},
 					Period:       720 * time.Hour,
@@ -80,10 +79,9 @@ func TestNewConfig(t *testing.T) {
 					Endpoint: "http://example.com",
 				},
 				Prune: grafana.PruneConfig{
-					Dry:        true,
-					Namespaces: []string{"default"},
-					Interval:   10 * time.Minute,
-					Period:     720 * time.Hour,
+					Dry:      true,
+					Interval: 10 * time.Minute,
+					Period:   720 * time.Hour,
 					Labels: map[string]string{
 						"app": "grafana",
 					},
@@ -109,10 +107,9 @@ func TestNewConfig(t *testing.T) {
 					Endpoint: "http://example.com",
 				},
 				Prune: grafana.PruneConfig{
-					Dry:        true,
-					Namespaces: []string{"default"},
-					Interval:   10 * time.Minute,
-					Period:     720 * time.Hour,
+					Dry:      true,
+					Interval: 10 * time.Minute,
+					Period:   720 * time.Hour,
 					Labels: map[string]string{
 						"app": "grafana",
 					},
@@ -182,66 +179,25 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/invalid_prune_interval.yaml",
 			expectedConfig: nil,
 			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
-				`  line 12: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
+				`  line 10: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune period": {
 			configPath:     "testdata/invalid_prune_period.yaml",
 			expectedConfig: nil,
 			expectedError: `loading configuration: parsing config file: yaml: unmarshal errors:` + "\n" +
-				`  line 15: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
+				`  line 13: cannot unmarshal !!str ` + "`invalid...`" + ` into time.Duration`,
 		},
 		"invalid prune lower threshold": {
 			configPath:     "testdata/invalid_prune_lower_threshold.yaml",
 			expectedConfig: nil,
 			expectedError: "loading configuration: parsing config file: yaml: unmarshal " +
-				"errors:\n  line 25: cannot unmarshal !!str `nope` into int",
+				"errors:\n  line 23: cannot unmarshal !!str `nope` into int",
 		},
 		"negative prune lower threshold": {
 			configPath:     "testdata/negative_prune_lower_threshold.yaml",
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Prune.LowerThreshold' " +
 				"Error:Field validation for 'LowerThreshold' failed on the 'min' tag",
-		},
-		"missing prune namespaces": {
-			configPath: "testdata/missing_prune_namespaces.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelInfo,
-				},
-				Server: server.Config{
-					Host: "localhost",
-					Port: 8080,
-				},
-				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
-				},
-				Prune: grafana.PruneConfig{
-					Dry:        true,
-					Namespaces: []string{"default"},
-					Interval:   10 * time.Minute,
-					Period:     720 * time.Hour,
-					Labels: map[string]string{
-						"app": "grafana",
-					},
-					LowerThreshold: 10,
-				},
-			},
-			expectedError: "",
-		},
-		"empty prune namespaces": {
-			configPath:     "testdata/empty_prune_namespaces.yaml",
-			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces' Error:" +
-				"Field validation for 'Namespaces' failed on the 'min' tag",
-		},
-		"empty string namespaces": {
-			configPath:     "testdata/empty_string_namespaces.yaml",
-			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Prune.Namespaces[0]' Error:" +
-				"Field validation for 'Namespaces[0]' failed on the 'required' tag",
 		},
 	}
 
@@ -277,10 +233,9 @@ func TestNewConfig(t *testing.T) {
 				Endpoint: "http://example.com",
 			},
 			Prune: grafana.PruneConfig{
-				Dry:        true,
-				Namespaces: []string{"default"},
-				Interval:   10 * time.Minute,
-				Period:     720 * time.Hour,
+				Dry:      true,
+				Interval: 10 * time.Minute,
+				Period:   720 * time.Hour,
 				Labels: map[string]string{
 					"app": "grafana",
 				},
@@ -306,7 +261,9 @@ func TestNewSecrets(t *testing.T) {
 			secretsPath: "testdata/valid_secrets.yaml",
 			expectedSecrets: &frigg.Secrets{
 				Grafana: grafana.Secrets{
-					Token: "example-valid-token",
+					Tokens: map[string]string{
+						"default": "example-valid-token",
+					},
 				},
 			},
 			expectedError: "",
@@ -330,14 +287,26 @@ func TestNewSecrets(t *testing.T) {
 		"missing grafana token in secrets": {
 			secretsPath:     "testdata/missing_grafana_secrets.yaml",
 			expectedSecrets: nil,
-			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
-				"Field validation for 'Token' failed on the 'required' tag",
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens' Error:" +
+				"Field validation for 'Tokens' failed on the 'required' tag",
 		},
 		"empty grafana token in secrets": {
 			secretsPath:     "testdata/empty_token_secrets.yaml",
 			expectedSecrets: nil,
-			expectedError: "validating secrets: Key: 'Secrets.Grafana.Token' Error:" +
-				"Field validation for 'Token' failed on the 'required' tag",
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens' Error:" +
+				"Field validation for 'Tokens' failed on the 'min' tag",
+		},
+		"empty key in tokens map": {
+			secretsPath:     "testdata/empty_key_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens[]' Error:" +
+				"Field validation for 'Tokens[]' failed on the 'required' tag",
+		},
+		"empty value in tokens map": {
+			secretsPath:     "testdata/empty_value_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens[default]' Error:" +
+				"Field validation for 'Tokens[default]' failed on the 'required' tag",
 		},
 	}
 

@@ -7,8 +7,6 @@ grafana:
 
 prune:
   dry: false
-  namespaces:
-    - default
   interval: 'invalid-duration'
   ignored_users:
     - 'admin'

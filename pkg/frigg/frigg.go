@@ -20,15 +20,15 @@ type Frigg struct {
 	logger   *slog.Logger
 	server   *server.Server
 	gatherer prometheus.Gatherer
-	pruner   dashboardPruner
+	pruners  []dashboardPruner
 }
 
-func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pruner dashboardPruner) *Frigg {
+func New(logger *slog.Logger, s *server.Server, gatherer prometheus.Gatherer, pruners []dashboardPruner) *Frigg {
 	return &Frigg{
 		logger:   logger,
 		server:   s,
 		gatherer: gatherer,
-		pruner:   pruner,
+		pruners:  pruners,
 	}
 }
 
@@ -38,7 +38,9 @@ func (f *Frigg) Start(ctx context.Context) error {
 
 	f.registerRoutes()
 
-	go f.pruner.Start(ctx)
+	for _, pruner := range f.pruners {
+		go pruner.Start(ctx)
+	}
 
 	if err := f.server.Start(); err != nil {
 		return errors.Wrap(err, "starting server")
