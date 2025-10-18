@@ -10,3 +10,12 @@ jobs:
   lint:
     name: Lint
     uses: ./.github/workflows/lint.yml
+  publish:
+    name: Publish
+    needs: [test, lint]
+    uses: ./.github/workflows/publish.yml
+    with:
+      version: ${{ github.sha }}
+    secrets:
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
