@@ -20,7 +20,7 @@ on:
 
 jobs:
   publish:
-    name: Publish
+    name: Image
     permissions:
       contents: read
     runs-on: ubuntu-22.04
@@ -32,9 +32,9 @@ jobs:
         with:
           go-version-file: go.mod
       - name: Install ko
-        uses: ko-build/setup-ko@3aebd0597dc1e9d1a26bcfdb7cbeb19c131d3037 # v0.7
+        uses: ko-build/setup-ko@d006021bd0c28d1ce33a07e7943d48b079944c8d # v0.9
       - name: Login to Docker Hub
-        uses: docker/login-action@74a5d142397b4f367a81b2e11e0c9d9cde48dd3c # v3.5.0
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
