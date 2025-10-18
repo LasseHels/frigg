@@ -1,0 +1,44 @@
+name: Publish
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to tag the image with
+        required: true
+        type: string
+      platforms:
+        description: Comma-separated list of platforms to build for
+        required: false
+        type: string
+        default: linux/amd64,linux/arm64
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  publish:
+    name: Image
+    permissions:
+      contents: read
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - name: Setup go
+        uses: actions/setup-go@d35c59abb061a4a6fb18e82ac0862c26744d6ab5 # v5.5.0
+        with:
+          go-version-file: go.mod
+      - name: Install ko
+        uses: ko-build/setup-ko@d006021bd0c28d1ce33a07e7943d48b079944c8d # v0.9
+      - name: Login to Docker Hub
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Build and push
+        run: ko build ./cmd/frigg --bare --platform=${{ inputs.platforms }} --tags=${{ inputs.version }}
+        env:
+          KO_DOCKER_REPO: lassehels/frigg
