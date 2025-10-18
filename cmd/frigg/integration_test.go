@@ -31,10 +31,10 @@ func TestFriggIntegration(t *testing.T) {
 	defer cancel()
 	eg, ctx := errgroup.WithContext(ctx)
 	release = "integration-test"
-	secretsPath, apiKey, grafana := setup(t)
+	env := setup(t)
 
 	eg.Go(func() error {
-		err := run(ctx, "testdata/integration_config.yaml", secretsPath, &out)
+		err := run(ctx, "testdata/integration_config.yaml", env.secretsPath, &out)
 		assert.NoError(t, err)
 		return err
 	})
@@ -55,22 +55,23 @@ func TestFriggIntegration(t *testing.T) {
 
 	t.Run("prunes dashboards", func(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
-			grafana.AssertDashboardDoesNotExist(collect, apiKey, "unuseddashboard")
-			grafana.AssertDashboardExists(collect, apiKey, "useddashboard")
-			grafana.AssertDashboardDoesNotExist(collect, apiKey, "ignoreduserdashboard")
+			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "unuseddashboard")
+			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "useddashboard")
+			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "ignoreduserdashboard")
+			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
 		}, time.Second*10, time.Millisecond*100)
 	})
 
 	logs := out.String()
 	assert.Contains(t, logs, "Loading configuration file from path testdata/integration_config.yaml\n")
-	assert.Contains(t, logs, fmt.Sprintf("Loading secrets file from path %s\n", secretsPath))
+	assert.Contains(t, logs, fmt.Sprintf("Loading secrets file from path %s\n", env.secretsPath))
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/health","methods":["GET"]`)
 	assert.Contains(t, logs, `"msg":"Registered route","release":"integration-test","path":"/metrics","methods":["GET"]`)
 	assert.Contains(
 		t,
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
-			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard","namespace":"default",`+
+			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"ignoreduserdashboard\"}"}`,
 	)
@@ -78,7 +79,7 @@ func TestFriggIntegration(t *testing.T) {
 		t,
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
-			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard","namespace":"default",`+
+			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"unuseddashboard\"}"}`,
 	)
@@ -88,6 +89,20 @@ func TestFriggIntegration(t *testing.T) {
 		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"default",`+
 			`"deleted_count":2,"deleted_dashboards":"default/ignoreduserdashboard, default/unuseddashboard"}`,
 	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"org-2",`+
+			`"uid":"JfROTruBNXvUjXF8aD455yc2sRiB397AL6Pscl8QChsX","name":"purpleunuseddashboard",`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},`+
+			`\"timepicker\":{},\"timezone\":\"browser\",\"title\":\"purpleunuseddashboard\"}"}`,
+	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"org-2",`+
+			`"deleted_count":1,"deleted_dashboards":"org-2/purpleunuseddashboard"}`,
+	)
 
 	t.Run("shuts down gracefully", func(t *testing.T) {
 		cancel()
@@ -96,7 +111,15 @@ func TestFriggIntegration(t *testing.T) {
 	})
 }
 
-func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
+type testEnvironment struct {
+	secretsPath     string
+	apiKey          string
+	purpleKey       string
+	purpleNamespace string
+	grafana         *integrationtest.Grafana
+}
+
+func setup(t *testing.T) testEnvironment {
 	t.Helper()
 
 	now := time.Now().UTC()
@@ -107,38 +130,50 @@ func setup(t *testing.T) (string, string, *integrationtest.Grafana) {
 			loki: loki,
 			t:    t,
 			timestamps: map[string]time.Time{
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/useddashboard":        now.Add(-5 * time.Minute),
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/ignoreduserdashboard": now.Add(-5 * time.Minute),
-				"/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/unuseddashboard":      now.Add(-15 * time.Minute), //nolint:lll
+				"useddashboard":         now.Add(-5 * time.Minute),
+				"ignoreduserdashboard":  now.Add(-5 * time.Minute),
+				"unuseddashboard":       now.Add(-15 * time.Minute),
+				"purpleunuseddashboard": now.Add(-15 * time.Minute),
 			},
 		},
 	)
 
-	apiKey := grafana.CreateAPIKey(t, "test-key")
-	ignoredKey := grafana.CreateAPIKey(t, "john-doe")
+	orgID := grafana.CreateOrganisation(t, "purple")
+	purpleNamespace := fmt.Sprintf("org-%d", orgID)
+	apiKey := grafana.CreateAPIKey(t, "test-key", integrationtest.DefaultOrgID)
+	ignoredKey := grafana.CreateAPIKey(t, "john-doe", integrationtest.DefaultOrgID)
+	purpleKey := grafana.CreateAPIKey(t, "purple-key", orgID)
 
 	secrets := fmt.Sprintf(`
 grafana:
   tokens:
     default: %s
-`, apiKey)
+    %s: %s
+`, apiKey, purpleNamespace, purpleKey)
 	secretsPath := filepath.Join(t.TempDir(), "secrets.yaml")
 	err := os.WriteFile(secretsPath, []byte(secrets), os.ModePerm)
 	require.NoError(t, err)
 
-	grafana.CreateDashboard(t, apiKey, "useddashboard")
-	grafana.CreateDashboard(t, apiKey, "unuseddashboard")
-	grafana.CreateDashboard(t, apiKey, "ignoreduserdashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "useddashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "unuseddashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
+	grafana.CreateDashboard(t, purpleKey, purpleNamespace, "purpleunuseddashboard")
 
 	// Assert that the dashboard exists to create a read log entry in Loki.
-	grafana.AssertDashboardExists(t, apiKey, "useddashboard")
+	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboard")
 	// Create a log entry in Loki for the ignored user.
-	grafana.AssertDashboardExists(t, ignoredKey, "ignoreduserdashboard")
+	grafana.AssertDashboardExists(t, ignoredKey, "default", "ignoreduserdashboard")
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
 
-	return secretsPath, apiKey, grafana
+	return testEnvironment{
+		secretsPath:     secretsPath,
+		apiKey:          apiKey,
+		purpleKey:       purpleKey,
+		purpleNamespace: purpleNamespace,
+		grafana:         grafana,
+	}
 }
 
 func waitForServer(t *testing.T, url string) {
