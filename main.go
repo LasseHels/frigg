@@ -15,7 +15,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/collectors"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/LasseHels/frigg/pkg/frigg"
+	"github.com/LasseHels/frigg/frigg"
 )
 
 // release is set through the linker at build time, generally from a git sha. Used for logging and error reporting.

@@ -14,7 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LasseHels/frigg/integrationtest"
-	"github.com/LasseHels/frigg/pkg/loki"
+	"github.com/LasseHels/frigg/loki"
 )
 
 type lokiPushStream struct {

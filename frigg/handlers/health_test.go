@@ -10,7 +10,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"github.com/LasseHels/frigg/pkg/frigg/handlers"
+	"github.com/LasseHels/frigg/frigg/handlers"
 )
 
 func TestHealth(t *testing.T) {

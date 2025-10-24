@@ -39,6 +39,6 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Build and push
-        run: ko build ./cmd/frigg --bare --platform=${{ inputs.platforms }} --tags=${{ inputs.version }}
+        run: ko build . --bare --platform=${{ inputs.platforms }} --tags=${{ inputs.version }}
         env:
           KO_DOCKER_REPO: lassehels/frigg
