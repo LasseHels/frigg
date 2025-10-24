@@ -12,3 +12,7 @@ prune:
   period: '720h'
   labels:
     app: 'grafana'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

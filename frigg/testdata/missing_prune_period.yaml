@@ -16,3 +16,7 @@ prune:
   labels:
     app: 'grafana'
     env: 'test'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

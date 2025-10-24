@@ -8,6 +8,8 @@ log:
 loki:
   endpoint: 'http://loki.example.com'
 
+grafana: {}
+
 prune:
   dry: false
   interval: '5m'
@@ -17,3 +19,7 @@ prune:
   labels:
     app: 'grafana'
     env: 'test'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

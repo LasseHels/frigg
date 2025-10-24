@@ -14,22 +14,33 @@ import (
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 
-	grafana2 "github.com/LasseHels/frigg/grafana"
+	"github.com/LasseHels/frigg/github"
+	"github.com/LasseHels/frigg/grafana"
 	"github.com/LasseHels/frigg/log"
-	loki2 "github.com/LasseHels/frigg/loki"
-	server2 "github.com/LasseHels/frigg/server"
+	"github.com/LasseHels/frigg/loki"
+	"github.com/LasseHels/frigg/server"
 )
 
 type Secrets struct {
-	Grafana grafana2.Secrets `yaml:"grafana" validate:"required"`
+	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
+	Backup  BackupSecrets   `yaml:"backup" validate:"required"`
+}
+
+type BackupSecrets struct {
+	GitHub github.Secrets `yaml:"github" validate:"required"`
 }
 
 type Config struct {
-	Log     log.Config           `yaml:"log"`
-	Server  server2.Config       `yaml:"server"`
-	Loki    loki2.Config         `yaml:"loki" validate:"required"`
-	Grafana grafana2.Config      `yaml:"grafana" validate:"required"`
-	Prune   grafana2.PruneConfig `yaml:"prune" validate:"required"`
+	Log     log.Config          `yaml:"log"`
+	Server  server.Config       `yaml:"server"`
+	Loki    loki.Config         `yaml:"loki" validate:"required"`
+	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
+	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
+	Backup  BackupConfig        `yaml:"backup" validate:"required"`
+}
+
+type BackupConfig struct {
+	GitHub github.Config `yaml:"github" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.
@@ -77,6 +88,8 @@ func (c *Config) defaults() {
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
+	c.Backup.GitHub.Branch = "main"
+	c.Backup.GitHub.Directory = "deleted-dashboards"
 }
 
 // load configuration from a YAML file at path.
@@ -114,11 +127,11 @@ func mustParseURL(rawURL string) *url.URL {
 // Initialise Frigg from the provided Config.
 // This assumes that the provided Config has already been validated and might panic if not.
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
-	s := server2.New(c.Server, logger)
+	s := server.New(c.Server, logger)
 
 	httpClient := &http.Client{}
 
-	lokiClient := loki2.NewClient(loki2.ClientOptions{
+	lokiClient := loki.NewClient(loki.ClientOptions{
 		Endpoint:   c.Loki.Endpoint,
 		HTTPClient: httpClient,
 		Logger:     logger,
@@ -128,7 +141,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 
 	var pruners []dashboardPruner
 	for namespace, token := range secrets.Grafana.Tokens {
-		grafanaClient, err := grafana2.NewClient(&grafana2.NewClientOptions{
+		grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
 			Logger:     logger,
 			Client:     lokiClient,
 			HTTPClient: httpClient,
@@ -139,7 +152,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			return nil, errors.Wrapf(err, "creating Grafana client for namespace %s", namespace)
 		}
 
-		pruner := grafana2.NewDashboardPruner(&grafana2.NewDashboardPrunerOptions{
+		pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
 			Grafana:        grafanaClient,
 			Logger:         logger,
 			Namespace:      namespace,
@@ -168,7 +181,7 @@ func (s *Secrets) validate() error {
 
 // validate performs validation on any struct using the validator package.
 func validate(s any) error {
-	v := validator.New()
+	v := validator.New(validator.WithRequiredStructEnabled())
 
 	if err := v.Struct(s); err != nil {
 		var errs []error

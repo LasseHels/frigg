@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/LasseHels/frigg/frigg"
+	"github.com/LasseHels/frigg/github"
 	"github.com/LasseHels/frigg/grafana"
 	"github.com/LasseHels/frigg/log"
 	"github.com/LasseHels/frigg/loki"
@@ -26,11 +27,12 @@ func TestNewConfig(t *testing.T) {
 		"empty config file": {
 			configPath:     "testdata/empty_config.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Loki' Error:" +
+				"Field validation for 'Loki' failed on the 'required' tag; Key: 'Config.Grafana' Error:" +
+				"Field validation for 'Grafana' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
 				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
-				"Field validation for 'Labels' failed on the 'required' tag",
+				"Field validation for 'Labels' failed on the 'required' tag; Key: 'Config.Backup.GitHub.Repository' Error:" +
+				"Field validation for 'Repository' failed on the 'required' tag",
 		},
 		"valid config": {
 			configPath: "testdata/valid_config.yaml",
@@ -58,6 +60,13 @@ func TestNewConfig(t *testing.T) {
 						"env": "test",
 					},
 					LowerThreshold: 50,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "backup-branch",
+						Directory:  "archived-dashboards",
+					},
 				},
 			},
 			expectedError: "",
@@ -87,6 +96,13 @@ func TestNewConfig(t *testing.T) {
 					},
 					LowerThreshold: 10,
 				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
 			},
 			expectedError: "",
 		},
@@ -114,6 +130,13 @@ func TestNewConfig(t *testing.T) {
 						"app": "grafana",
 					},
 					LowerThreshold: 10,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
 				},
 			},
 			expectedError: "",
@@ -148,8 +171,8 @@ func TestNewConfig(t *testing.T) {
 		"missing grafana endpoint": {
 			configPath:     "testdata/missing_grafana_endpoint.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Grafana.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag",
+			expectedError: "validating configuration: Key: 'Config.Grafana' Error:" +
+				"Field validation for 'Grafana' failed on the 'required' tag",
 		},
 		"invalid grafana endpoint url": {
 			configPath:     "testdata/invalid_grafana_endpoint.yaml",
@@ -160,8 +183,8 @@ func TestNewConfig(t *testing.T) {
 		"missing loki endpoint": {
 			configPath:     "testdata/missing_loki_endpoint.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
-				"Field validation for 'Endpoint' failed on the 'required' tag",
+			expectedError: "validating configuration: Key: 'Config.Loki' Error:" +
+				"Field validation for 'Loki' failed on the 'required' tag",
 		},
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
@@ -198,6 +221,58 @@ func TestNewConfig(t *testing.T) {
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Prune.LowerThreshold' " +
 				"Error:Field validation for 'LowerThreshold' failed on the 'min' tag",
+		},
+		"invalid backup repository format": {
+			configPath:     "testdata/invalid_backup_repository.yaml",
+			expectedConfig: nil,
+			expectedError: "loading configuration: parsing config file: " +
+				`repository must be in format 'owner/repo', got "invalid-format"`,
+		},
+		"backup with defaults": {
+			configPath: "testdata/backup_with_defaults.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:      true,
+					Interval: 10 * time.Minute,
+					Period:   720 * time.Hour,
+					Labels: map[string]string{
+						"app": "grafana",
+					},
+					LowerThreshold: 10,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"missing backup repository": {
+			configPath:     "testdata/missing_backup_repository.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Backup.GitHub.Repository' Error:" +
+				"Field validation for 'Repository' failed on the 'required' tag",
+		},
+		"empty backup repository": {
+			configPath:     "testdata/empty_backup_repository.yaml",
+			expectedConfig: nil,
+			expectedError:  "loading configuration: parsing config file: repository must be in format 'owner/repo', got \"\"",
 		},
 	}
 
@@ -241,6 +316,13 @@ func TestNewConfig(t *testing.T) {
 				},
 				LowerThreshold: 10,
 			},
+			Backup: frigg.BackupConfig{
+				GitHub: github.Config{
+					Repository: exampleRepository(t),
+					Branch:     "main",
+					Directory:  "deleted-dashboards",
+				},
+			},
 		}
 
 		cfg, err := frigg.NewConfig("testdata/env_expansion_config.yaml")
@@ -263,6 +345,11 @@ func TestNewSecrets(t *testing.T) {
 				Grafana: grafana.Secrets{
 					Tokens: map[string]string{
 						"default": "example-valid-token",
+					},
+				},
+				Backup: frigg.BackupSecrets{
+					GitHub: github.Secrets{
+						Token: "ghp_exampletoken123",
 					},
 				},
 			},
@@ -288,7 +375,7 @@ func TestNewSecrets(t *testing.T) {
 			secretsPath:     "testdata/missing_grafana_secrets.yaml",
 			expectedSecrets: nil,
 			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens' Error:" +
-				"Field validation for 'Tokens' failed on the 'required' tag",
+				"Field validation for 'Tokens' failed on the 'min' tag",
 		},
 		"empty grafana token in secrets": {
 			secretsPath:     "testdata/empty_token_secrets.yaml",
@@ -308,6 +395,18 @@ func TestNewSecrets(t *testing.T) {
 			expectedError: "validating secrets: Key: 'Secrets.Grafana.Tokens[default]' Error:" +
 				"Field validation for 'Tokens[default]' failed on the 'required' tag",
 		},
+		"missing backup token in secrets": {
+			secretsPath:     "testdata/missing_backup_token_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Backup' Error:" +
+				"Field validation for 'Backup' failed on the 'required' tag",
+		},
+		"empty backup token in secrets": {
+			secretsPath:     "testdata/empty_backup_token_secrets.yaml",
+			expectedSecrets: nil,
+			expectedError: "validating secrets: Key: 'Secrets.Backup' Error:" +
+				"Field validation for 'Backup' failed on the 'required' tag",
+		},
 	}
 
 	for name, tt := range tests {
@@ -325,4 +424,11 @@ func TestNewSecrets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func exampleRepository(t testing.TB) github.Repository {
+	t.Helper()
+	r, err := github.NewRepository("octocat", "hello-world")
+	require.NoError(t, err)
+	return *r
 }
