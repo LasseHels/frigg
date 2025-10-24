@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/LasseHels/frigg/pkg/loki"
+	"github.com/LasseHels/frigg/loki"
 )
 
 type mockHTTPClient struct {

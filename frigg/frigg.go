@@ -8,8 +8,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
-	"github.com/LasseHels/frigg/pkg/frigg/handlers"
-	"github.com/LasseHels/frigg/pkg/server"
+	"github.com/LasseHels/frigg/frigg/handlers"
+	"github.com/LasseHels/frigg/server"
 )
 
 type dashboardPruner interface {

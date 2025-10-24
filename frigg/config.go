@@ -14,22 +14,22 @@ import (
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 
-	"github.com/LasseHels/frigg/pkg/grafana"
-	"github.com/LasseHels/frigg/pkg/log"
-	"github.com/LasseHels/frigg/pkg/loki"
-	"github.com/LasseHels/frigg/pkg/server"
+	grafana2 "github.com/LasseHels/frigg/grafana"
+	"github.com/LasseHels/frigg/log"
+	loki2 "github.com/LasseHels/frigg/loki"
+	server2 "github.com/LasseHels/frigg/server"
 )
 
 type Secrets struct {
-	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
+	Grafana grafana2.Secrets `yaml:"grafana" validate:"required"`
 }
 
 type Config struct {
-	Log     log.Config          `yaml:"log"`
-	Server  server.Config       `yaml:"server"`
-	Loki    loki.Config         `yaml:"loki" validate:"required"`
-	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
-	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
+	Log     log.Config           `yaml:"log"`
+	Server  server2.Config       `yaml:"server"`
+	Loki    loki2.Config         `yaml:"loki" validate:"required"`
+	Grafana grafana2.Config      `yaml:"grafana" validate:"required"`
+	Prune   grafana2.PruneConfig `yaml:"prune" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.
@@ -114,11 +114,11 @@ func mustParseURL(rawURL string) *url.URL {
 // Initialise Frigg from the provided Config.
 // This assumes that the provided Config has already been validated and might panic if not.
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
-	s := server.New(c.Server, logger)
+	s := server2.New(c.Server, logger)
 
 	httpClient := &http.Client{}
 
-	lokiClient := loki.NewClient(loki.ClientOptions{
+	lokiClient := loki2.NewClient(loki2.ClientOptions{
 		Endpoint:   c.Loki.Endpoint,
 		HTTPClient: httpClient,
 		Logger:     logger,
@@ -128,7 +128,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 
 	var pruners []dashboardPruner
 	for namespace, token := range secrets.Grafana.Tokens {
-		grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
+		grafanaClient, err := grafana2.NewClient(&grafana2.NewClientOptions{
 			Logger:     logger,
 			Client:     lokiClient,
 			HTTPClient: httpClient,
@@ -139,7 +139,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			return nil, errors.Wrapf(err, "creating Grafana client for namespace %s", namespace)
 		}
 
-		pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
+		pruner := grafana2.NewDashboardPruner(&grafana2.NewDashboardPrunerOptions{
 			Grafana:        grafanaClient,
 			Logger:         logger,
 			Namespace:      namespace,

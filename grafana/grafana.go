@@ -14,7 +14,7 @@ import (
 
 	"github.com/pkg/errors"
 
-	"github.com/LasseHels/frigg/pkg/loki"
+	"github.com/LasseHels/frigg/loki"
 )
 
 type client interface {
