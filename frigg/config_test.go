@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/LasseHels/frigg/pkg/frigg"
-	"github.com/LasseHels/frigg/pkg/grafana"
-	"github.com/LasseHels/frigg/pkg/log"
-	"github.com/LasseHels/frigg/pkg/loki"
-	"github.com/LasseHels/frigg/pkg/server"
+	"github.com/LasseHels/frigg/frigg"
+	"github.com/LasseHels/frigg/grafana"
+	"github.com/LasseHels/frigg/log"
+	"github.com/LasseHels/frigg/loki"
+	"github.com/LasseHels/frigg/server"
 )
 
 func TestNewConfig(t *testing.T) {
