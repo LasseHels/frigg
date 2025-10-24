@@ -14,3 +14,7 @@ prune:
   ignored_users:
     - 'admin'
   period: '720h'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

@@ -149,6 +149,10 @@ grafana:
   tokens:
     default: %s
     %s: %s
+
+backup:
+  github:
+    token: 'ghp_exampletoken123'
 `, apiKey, purpleNamespace, purpleKey)
 	secretsPath := filepath.Join(t.TempDir(), "secrets.yaml")
 	err := os.WriteFile(secretsPath, []byte(secrets), os.ModePerm)

@@ -1,0 +1,72 @@
+package github
+
+import (
+	"errors"
+	"fmt"
+	"strings"
+)
+
+type Secrets struct {
+	Token string `yaml:"token" validate:"required"`
+}
+
+type Config struct {
+	Repository Repository `yaml:"repository" validate:"required"`
+	Branch     string     `yaml:"branch" validate:"required"`
+	Directory  string     `yaml:"directory" validate:"required"`
+}
+
+// Repository represents a GitHub repository in "owner/repo" format.
+type Repository struct {
+	owner string
+	repo  string
+}
+
+// NewRepository creates a new Repository with the given owner and repo. NewRepository returns an error if owner or repo
+// is empty.
+func NewRepository(owner, repo string) (*Repository, error) {
+	if owner == "" {
+		return nil, errors.New("owner cannot be empty")
+	}
+	if repo == "" {
+		return nil, errors.New("repo cannot be empty")
+	}
+	return &Repository{
+		owner: owner,
+		repo:  repo,
+	}, nil
+}
+
+// Owner returns the repository owner.
+func (r *Repository) Owner() string {
+	return r.owner
+}
+
+// Repo returns the repository name.
+func (r *Repository) Repo() string {
+	return r.repo
+}
+
+// UnmarshalYAML implements yaml.Unmarshaler for parsing "owner/repo" format.
+func (r *Repository) UnmarshalYAML(unmarshal func(any) error) error {
+	var s string
+	if err := unmarshal(&s); err != nil {
+		return err
+	}
+
+	parts := strings.Split(s, "/")
+	if len(parts) != 2 {
+		return fmt.Errorf("repository must be in format 'owner/repo', got %q", s)
+	}
+
+	if parts[0] == "" {
+		return errors.New("owner cannot be empty")
+	}
+	if parts[1] == "" {
+		return errors.New("repo cannot be empty")
+	}
+
+	r.owner = parts[0]
+	r.repo = parts[1]
+	return nil
+}

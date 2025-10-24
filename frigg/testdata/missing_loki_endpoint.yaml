@@ -5,6 +5,8 @@ server:
 log:
   level: ERROR
 
+loki: {}
+
 grafana:
   endpoint: 'http://example.com'
 
@@ -17,3 +19,7 @@ prune:
   labels:
     app: 'grafana'
     env: 'test'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

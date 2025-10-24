@@ -77,6 +77,20 @@ prune:
   #
   # Must be greater than or equal to 0 (default: 10).
   lower_threshold: 10
+
+backup:
+  github:
+    # GitHub repository where deleted dashboards will be backed up. The repository must be in the format 'owner/repo'.
+    # Frigg will back up dashboard JSON to this repository before deletion. If backing up a dashboard fails, the
+    # dashboard will not be deleted.
+    #
+    # Required.
+    repository: 'octocat/hello-world'
+    # Branch to commit deleted dashboards to (default: "main").
+    branch: 'main'
+    # Directory within the repository where deleted dashboards will be stored (default: "deleted-dashboards").
+    # Dashboards will be saved as "{directory}/{dashboard-namespace}/{dashboard-name}.json".
+    directory: 'deleted-dashboards'
 ```
 
 ### Secrets File Structure
@@ -99,6 +113,21 @@ grafana:
         default: 'token-for-the-default-namespace'
         org-1: 'token-for-the-org-1-namespace'
         stacks-5: 'token-for-the-stacks-5-namespace'
+
+backup:
+    github:
+        # GitHub personal access token or fine-grained token for authenticating with the GitHub API.
+        #
+        # The token must have the following permissions:
+        # - Contents: Read and write (to create, read, and update files in the repository)
+        #
+        # For fine-grained tokens, these permissions should be scoped to the specific repository.
+        # For classic tokens, the 'repo' scope is required.
+        #
+        # See https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+        #
+        # Required.
+        token: 'ghp_exampletoken123'
 ```
 
 ### Environment Variable Expansion

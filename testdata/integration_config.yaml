@@ -17,3 +17,7 @@ prune:
     app: 'grafana'
     env: 'integration-test'
   lower_threshold: 2
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

@@ -14,6 +14,7 @@ import (
 	"go.uber.org/multierr"
 	"gopkg.in/yaml.v3"
 
+	"github.com/LasseHels/frigg/github"
 	"github.com/LasseHels/frigg/grafana"
 	"github.com/LasseHels/frigg/log"
 	"github.com/LasseHels/frigg/loki"
@@ -22,6 +23,11 @@ import (
 
 type Secrets struct {
 	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
+	Backup  BackupSecrets   `yaml:"backup" validate:"required"`
+}
+
+type BackupSecrets struct {
+	GitHub github.Secrets `yaml:"github" validate:"required"`
 }
 
 type Config struct {
@@ -30,6 +36,11 @@ type Config struct {
 	Loki    loki.Config         `yaml:"loki" validate:"required"`
 	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
 	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
+	Backup  BackupConfig        `yaml:"backup" validate:"required"`
+}
+
+type BackupConfig struct {
+	GitHub github.Config `yaml:"github" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.
@@ -77,6 +88,8 @@ func (c *Config) defaults() {
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
+	c.Backup.GitHub.Branch = "main"
+	c.Backup.GitHub.Directory = "deleted-dashboards"
 }
 
 // load configuration from a YAML file at path.
@@ -168,7 +181,7 @@ func (s *Secrets) validate() error {
 
 // validate performs validation on any struct using the validator package.
 func validate(s any) error {
-	v := validator.New()
+	v := validator.New(validator.WithRequiredStructEnabled())
 
 	if err := v.Struct(s); err != nil {
 		var errs []error

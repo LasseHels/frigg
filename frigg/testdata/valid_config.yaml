@@ -21,3 +21,9 @@ prune:
     app: 'grafana'
     env: 'test'
   lower_threshold: 50
+
+backup:
+  github:
+    repository: 'octocat/hello-world'
+    branch: 'backup-branch'
+    directory: 'archived-dashboards'
