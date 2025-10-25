@@ -47,6 +47,11 @@ func (r *Repository) Repo() string {
 	return r.repo
 }
 
+// Name returns the full repository name in "owner/repo" format.
+func (r *Repository) Name() string {
+	return r.owner + "/" + r.repo
+}
+
 // UnmarshalYAML implements yaml.Unmarshaler for parsing "owner/repo" format.
 func (r *Repository) UnmarshalYAML(unmarshal func(any) error) error {
 	var s string

@@ -53,6 +53,7 @@ func TestNewRepository(t *testing.T) {
 			require.NotNil(t, r)
 			assert.Equal(t, tc.owner, r.Owner())
 			assert.Equal(t, tc.repo, r.Repo())
+			assert.Equal(t, tc.owner+"/"+tc.repo, r.Name())
 		})
 	}
 }
@@ -121,6 +122,7 @@ func TestRepository_UnmarshalYAML(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, tc.wantOwner, config.Repository.Owner())
 			assert.Equal(t, tc.wantRepo, config.Repository.Repo())
+			assert.Equal(t, tc.wantOwner+"/"+tc.wantRepo, config.Repository.Name())
 		})
 	}
 }
