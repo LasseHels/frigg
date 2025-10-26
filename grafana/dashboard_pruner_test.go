@@ -21,7 +21,7 @@ type mockGrafanaClient struct {
 		opts UsedDashboardsOptions,
 	) ([]DashboardReads, error)
 	allDashboards   func(ctx context.Context, namespace string) ([]Dashboard, error)
-	deleteDashboard func(ctx context.Context, namespace string, uid string) error
+	deleteDashboard func(ctx context.Context, namespace, name string, dashboardJSON []byte) error
 }
 
 func (m *mockGrafanaClient) UsedDashboards(
@@ -37,8 +37,8 @@ func (m *mockGrafanaClient) AllDashboards(ctx context.Context, namespace string)
 	return m.allDashboards(ctx, namespace)
 }
 
-func (m *mockGrafanaClient) DeleteDashboard(ctx context.Context, namespace, uid string) error {
-	return m.deleteDashboard(ctx, namespace, uid)
+func (m *mockGrafanaClient) DeleteDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error {
+	return m.deleteDashboard(ctx, namespace, name, dashboardJSON)
 }
 
 func TestDashboardPruner_Start(t *testing.T) {
@@ -188,7 +188,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 	t.Run("success with unused dashboards", func(t *testing.T) {
 		t.Parallel()
 
-		var deletedUIDs []string
+		var deletedNames []string
 
 		mockClient := &mockGrafanaClient{
 			allDashboards: func(_ context.Context, _ string) ([]Dashboard, error) {
@@ -223,8 +223,19 @@ func TestDashboardPruner_Prune(t *testing.T) {
 					newMockDashboardReads("dashboard1", 10, 2),
 				}, nil
 			},
-			deleteDashboard: func(_ context.Context, _ string, uid string) error {
-				deletedUIDs = append(deletedUIDs, uid)
+			deleteDashboard: func(ctx context.Context, namespace, name string, dashboardJSON []byte) error {
+				deletedNames = append(deletedNames, name)
+				assert.Equal(t, "default", namespace)
+
+				switch name {
+				case "dashboard2":
+					assert.JSONEq(t, `{"title": "Dashboard 2"}`, string(dashboardJSON))
+				case "dashboard3":
+					assert.JSONEq(t, `{"title": "Dashboard 3"}`, string(dashboardJSON))
+				default:
+					t.Errorf("unexpected dashboard deleted: %s", name)
+				}
+
 				return nil
 			},
 		}
@@ -243,7 +254,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 
 		err := pruner.prune(t.Context())
 		require.NoError(t, err)
-		assert.ElementsMatch(t, []string{"dashboard2", "dashboard3"}, deletedUIDs)
+		assert.ElementsMatch(t, []string{"dashboard2", "dashboard3"}, deletedNames)
 
 		//nolint:lll
 		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false,"namespace":"default"}
@@ -291,7 +302,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 					newMockDashboardReads("dashboard1", 10, 2),
 				}, nil
 			},
-			deleteDashboard: func(_ context.Context, _ string, uid string) error {
+			deleteDashboard: func(_ context.Context, _ string, _ string, _ []byte) error {
 				deleteDashboardCalled = true
 				return nil
 			},
@@ -417,7 +428,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			) ([]DashboardReads, error) {
 				return nil, nil
 			},
-			deleteDashboard: func(_ context.Context, _ string, _ string) error {
+			deleteDashboard: func(_ context.Context, _ string, _ string, _ []byte) error {
 				return errors.New("dashboard delete failed")
 			},
 		}

@@ -716,7 +716,7 @@ func TestClient_AllDashboards(t *testing.T) {
 func TestClient_DeleteDashboard(t *testing.T) {
 	t.Parallel()
 
-	t.Run("empty uid", func(t *testing.T) {
+	t.Run("empty name", func(t *testing.T) {
 		t.Parallel()
 
 		g, err := grafana.NewClient(&grafana.NewClientOptions{
@@ -724,11 +724,12 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, "https://grafana.example.com"),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "")
-		require.EqualError(t, err, "dashboard UID must not be empty")
+		err = g.DeleteDashboard(t.Context(), "default", "", nil)
+		require.EqualError(t, err, "dashboard name must not be empty")
 	})
 
 	t.Run("server error", func(t *testing.T) {
@@ -746,10 +747,11 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", nil)
 		require.EqualError(t, err, "unexpected status code: 500, body: server error")
 	})
 
@@ -768,10 +770,11 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", nil)
 		require.EqualError(
 			t,
 			err,
@@ -805,10 +808,11 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", nil)
 		require.EqualError(
 			t,
 			err,
@@ -846,12 +850,13 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: http.DefaultClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", nil)
 		require.NoError(t, err)
-		assert.Equal(t, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard-uid", request.URL.Path)
+		assert.Equal(t, "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard-name", request.URL.Path)
 		assert.Equal(t, "Bearer abc123", request.Header.Get("Authorization"))
 		assert.Equal(t, "application/json", request.Header.Get("Accept"))
 		assert.Equal(t, "application/json", request.Header.Get("Content-Type"))
@@ -876,12 +881,83 @@ func TestClient_DeleteDashboard(t *testing.T) {
 			HTTPClient: errorClient,
 			Endpoint:   mustParseURL(t, server.URL),
 			Token:      "abc123",
+			Storage:    noopStorage,
 		})
 		require.NoError(t, err)
 
-		err = g.DeleteDashboard(t.Context(), "default", "dashboard-uid")
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", nil)
 		require.ErrorContains(t, err, "making request to Grafana")
 		require.ErrorContains(t, err, "simulated client error")
+	})
+
+	t.Run("backup called before deletion", func(t *testing.T) {
+		t.Parallel()
+
+		var backupCalled bool
+		var deletionCalled bool
+		var callOrder []string
+
+		storage := &mockStorage{
+			backUpDashboard: func(_ context.Context, namespace, name string, dashboardJSON []byte) error {
+				backupCalled = true
+				callOrder = append(callOrder, "backup")
+				assert.Equal(t, "default", namespace)
+				assert.Equal(t, "dashboard-name", name)
+				assert.JSONEq(t, `{"title":"Test"}`, string(dashboardJSON))
+				return nil
+			},
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			deletionCalled = true
+			callOrder = append(callOrder, "deletion")
+			w.WriteHeader(http.StatusOK)
+			_, err := w.Write([]byte(`{"status": "Success"}`))
+			assert.NoError(t, err)
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+			Storage:    storage,
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", []byte(`{"title":"Test"}`))
+		require.NoError(t, err)
+		assert.True(t, backupCalled, "backup should be called")
+		assert.True(t, deletionCalled, "deletion should be called")
+		assert.Equal(t, []string{"backup", "deletion"}, callOrder, "backup must be called before deletion")
+	})
+
+	t.Run("backup failure blocks deletion", func(t *testing.T) {
+		t.Parallel()
+
+		storage := &mockStorage{
+			backUpDashboard: func(_ context.Context, _, _ string, _ []byte) error {
+				return errors.New("GitHub API error")
+			},
+		}
+
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			assert.Fail(t, "deletion should not be called when backup fails")
+		}))
+		defer server.Close()
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger:     slog.Default(),
+			HTTPClient: http.DefaultClient,
+			Endpoint:   mustParseURL(t, server.URL),
+			Token:      "abc123",
+			Storage:    storage,
+		})
+		require.NoError(t, err)
+
+		err = g.DeleteDashboard(t.Context(), "default", "dashboard-name", []byte(`{"title":"Test"}`))
+		require.EqualError(t, err, "backing up dashboard: GitHub API error")
 	})
 }
 
@@ -890,6 +966,20 @@ type errorTransport struct{}
 
 func (e *errorTransport) RoundTrip(*http.Request) (*http.Response, error) {
 	return nil, errors.New("simulated client error")
+}
+
+type mockStorage struct {
+	backUpDashboard func(ctx context.Context, namespace, name string, dashboardJSON []byte) error
+}
+
+func (m *mockStorage) BackUpDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error {
+	return m.backUpDashboard(ctx, namespace, name, dashboardJSON)
+}
+
+var noopStorage = &mockStorage{
+	backUpDashboard: func(_ context.Context, _, _ string, _ []byte) error {
+		return nil
+	},
 }
 
 func mustParseURL(t *testing.T, input string) url.URL {

@@ -18,7 +18,7 @@ type grafanaClient interface {
 		opts UsedDashboardsOptions,
 	) ([]DashboardReads, error)
 	AllDashboards(ctx context.Context, namespace string) ([]Dashboard, error)
-	DeleteDashboard(ctx context.Context, namespace string, uid string) error
+	DeleteDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error
 }
 
 type DashboardPruner struct {
@@ -145,7 +145,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 		}
 
 		dashboardLogger.Info("Deleting unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
-		if err := d.grafana.DeleteDashboard(ctx, dashboard.Namespace, dashboard.Name); err != nil {
+		if err := d.grafana.DeleteDashboard(ctx, dashboard.Namespace, dashboard.Name, dashboard.Spec); err != nil {
 			return errors.Wrapf(err, "deleting unused dashboard %s", dashboard.UID)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
