@@ -1,7 +1,9 @@
 package integrationtest
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -22,7 +24,7 @@ import (
 type GitHub struct {
 	url      string
 	t        testing.TB
-	requests []*http.Request
+	requests map[string][]*http.Request
 }
 
 // NewGitHub creates a new faux GitHub API server.
@@ -30,7 +32,8 @@ func NewGitHub(t testing.TB) *GitHub {
 	t.Helper()
 
 	g := &GitHub{
-		t: t,
+		t:        t,
+		requests: make(map[string][]*http.Request),
 	}
 
 	server := httptest.NewServer(http.HandlerFunc(g.handle))
@@ -45,13 +48,20 @@ func (g *GitHub) URL() string {
 	return g.url
 }
 
-// Requests returns all HTTP requests received by the faux GitHub API server.
-func (g *GitHub) Requests() []*http.Request {
+// Requests returns all HTTP requests received by the faux GitHub API server, keyed by "{METHOD} {PATH}".
+func (g *GitHub) Requests() map[string][]*http.Request {
 	return g.requests
 }
 
 func (g *GitHub) handle(w http.ResponseWriter, r *http.Request) {
-	g.requests = append(g.requests, r)
+	// Read the body and replace it with a new reader so tests can read it again. If we don't do this, then tests that
+	// fetch the request and attempt to read its body will fail with "http: invalid Read on closed Body".
+	bodyBytes, err := io.ReadAll(r.Body)
+	assert.NoError(g.t, err)
+	r.Body = io.NopCloser(bytes.NewBuffer(bodyBytes))
+
+	key := r.Method + " " + r.URL.Path
+	g.requests[key] = append(g.requests[key], r)
 
 	path := strings.TrimPrefix(r.URL.Path, "/api/v3")
 	if path == r.URL.Path {

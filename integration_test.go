@@ -60,6 +60,42 @@ func TestFriggIntegration(t *testing.T) {
 			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "ignoreduserdashboard")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
 		}, time.Second*10, time.Millisecond*100)
+
+		requests := env.github.Requests()
+
+		expectedKeys := []string{
+			"GET /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/default/ignoreduserdashboard.json",
+			"PUT /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/default/ignoreduserdashboard.json",
+			"GET /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/default/unuseddashboard.json",
+			"PUT /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/default/unuseddashboard.json",
+			"GET /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/org-2/purpleunuseddashboard.json",
+			"PUT /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/org-2/purpleunuseddashboard.json",
+		}
+		assertEqualKeys(t, expectedKeys, requests)
+
+		expectedBackups := map[string]string{
+			"default/ignoreduserdashboard": `{"message":"Back up deleted Grafana dashboard default/ignoreduserdashboard",` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJpZ25vcmVkdXNlcmRhc2hib2FyZCJ9"` +
+				`,"branch":"main"}`,
+			"default/unuseddashboard": `{"message":"Back up deleted Grafana dashboard default/unuseddashboard",` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJ1bnVzZWRkYXNoYm9hcmQifQ=="` +
+				`,"branch":"main"}`,
+			"org-2/purpleunuseddashboard": `{"message":"Back up deleted Grafana dashboard org-2/purpleunuseddashboard",` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJwdXJwbGV1bnVzZWRkYXNoYm9hcmQifQ=="` +
+				`,"branch":"main"}`,
+		}
+
+		for dashboardPath, expectedBody := range expectedBackups {
+			key := "PUT /api/v3/repos/octocat/hello-world/contents/deleted-dashboards/" + dashboardPath + ".json"
+			putRequests := requests[key]
+			require.Len(t, putRequests, 1)
+
+			body := readRequestBody(t, putRequests[0])
+			assert.JSONEq(t, expectedBody, body)
+		}
 	})
 
 	logs := out.String()
@@ -117,6 +153,7 @@ type testEnvironment struct {
 	purpleKey       string
 	purpleNamespace string
 	grafana         *integrationtest.Grafana
+	github          *integrationtest.GitHub
 }
 
 func setup(t *testing.T) testEnvironment {
@@ -180,6 +217,7 @@ backup:
 		purpleKey:       purpleKey,
 		purpleNamespace: purpleNamespace,
 		grafana:         grafana,
+		github:          github,
 	}
 }
 
@@ -207,6 +245,22 @@ func assertOK(t *testing.T, url string) string {
 	body, err := io.ReadAll(resp.Body)
 	require.NoError(t, err, "Failed to read response body")
 	return string(body)
+}
+
+func readRequestBody(t *testing.T, req *http.Request) string {
+	t.Helper()
+	body, err := io.ReadAll(req.Body)
+	require.NoError(t, err)
+	return string(body)
+}
+
+func assertEqualKeys(t *testing.T, expected []string, actual map[string][]*http.Request) {
+	t.Helper()
+	var actualKeys []string
+	for key := range actual {
+		actualKeys = append(actualKeys, key)
+	}
+	assert.ElementsMatch(t, expected, actualKeys)
 }
 
 type lokiLogConsumer struct {
