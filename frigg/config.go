@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/go-playground/validator/v10"
+	gogithub "github.com/google/go-github/v73/github"
 	"github.com/pkg/errors"
 	"github.com/prometheus/client_golang/prometheus"
 	"go.uber.org/multierr"
@@ -114,6 +115,30 @@ func (c *Config) load(path string) error {
 	return nil
 }
 
+// newGitHubClient creates a new GitHub client with the provided configuration and secrets.
+func (c *Config) newGitHubClient(
+	httpClient *http.Client,
+	secrets *Secrets,
+	logger *slog.Logger,
+) (*github.Client, error) {
+	client := gogithub.NewClient(httpClient).WithAuthToken(secrets.Backup.GitHub.Token)
+	if githubAPIURL := os.Getenv("GITHUB_API_URL"); githubAPIURL != "" {
+		var err error
+		client, err = client.WithEnterpriseURLs(githubAPIURL, githubAPIURL)
+		if err != nil {
+			return nil, errors.Wrap(err, "setting GitHub API URL")
+		}
+	}
+
+	return github.NewClient(&github.ClientOptions{
+		Client:     client,
+		Repository: c.Backup.GitHub.Repository,
+		Branch:     c.Backup.GitHub.Branch,
+		Directory:  c.Backup.GitHub.Directory,
+		Logger:     logger,
+	}), nil
+}
+
 // mustParseURL parses a URL and panics if it cannot be parsed.
 // This should only be used when the URL has already been validated.
 func mustParseURL(rawURL string) *url.URL {
@@ -139,6 +164,11 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 
 	grafanaURL := mustParseURL(c.Grafana.Endpoint)
 
+	githubClient, err := c.newGitHubClient(httpClient, secrets, logger)
+	if err != nil {
+		return nil, errors.Wrap(err, "creating GitHub client")
+	}
+
 	var pruners []dashboardPruner
 	for namespace, token := range secrets.Grafana.Tokens {
 		grafanaClient, err := grafana.NewClient(&grafana.NewClientOptions{
@@ -147,6 +177,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			HTTPClient: httpClient,
 			Endpoint:   *grafanaURL,
 			Token:      token,
+			Storage:    githubClient,
 		})
 		if err != nil {
 			return nil, errors.Wrapf(err, "creating Grafana client for namespace %s", namespace)

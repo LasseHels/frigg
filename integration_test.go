@@ -124,6 +124,7 @@ func setup(t *testing.T) testEnvironment {
 
 	now := time.Now().UTC()
 	loki := integrationtest.NewLoki(t)
+	github := integrationtest.NewGitHub(t)
 	grafana := integrationtest.NewGrafana(
 		t,
 		&lokiLogConsumer{
@@ -162,6 +163,8 @@ backup:
 	grafana.CreateDashboard(t, apiKey, "default", "unuseddashboard")
 	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
 	grafana.CreateDashboard(t, purpleKey, purpleNamespace, "purpleunuseddashboard")
+
+	t.Setenv("GITHUB_API_URL", github.URL())
 
 	// Assert that the dashboard exists to create a read log entry in Loki.
 	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboard")
