@@ -25,12 +25,17 @@ type httpClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
+type storage interface {
+	BackUpDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error
+}
+
 type Client struct {
 	logger     *slog.Logger
 	client     client
 	httpClient httpClient
 	endpoint   url.URL
 	token      string
+	storage    storage
 }
 
 type NewClientOptions struct {
@@ -43,7 +48,8 @@ type NewClientOptions struct {
 	// - List dashboards in the Grafana instance. Frigg can only evaluate usage of dashboards that it can list.
 	//   Dashboards that Token cannot list are not evaluated.
 	// - Delete dashboards.
-	Token string
+	Token   string
+	Storage storage
 }
 
 func (n *NewClientOptions) validate() error {
@@ -65,6 +71,7 @@ func NewClient(opts *NewClientOptions) (*Client, error) {
 		httpClient: opts.HTTPClient,
 		endpoint:   opts.Endpoint,
 		token:      opts.Token,
+		storage:    opts.Storage,
 	}, nil
 }
 
@@ -464,18 +471,27 @@ type deleteDashboardResponse struct {
 	Status string `json:"status"`
 }
 
-// DeleteDashboard deletes a dashboard by its UID.
+// DeleteDashboard backs up and then deletes a dashboard.
+//
+// The dashboard JSON is backed up using the configured storage before deletion. If the backup fails, the dashboard is
+// not deleted and an error is returned.
 //
 // DeleteDashboard uses the Grafana HTTP API endpoint DELETE
 // /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid to delete a dashboard in Grafana v12.
 //
-// See https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#delete-dashboard.
-func (c *Client) DeleteDashboard(ctx context.Context, namespace, uid string) error {
-	if uid == "" {
-		return errors.New("dashboard UID must not be empty")
+// See [documentation].
+//
+// [documentation]: https://grafana.com/docs/grafana/v12.0/developers/http_api/dashboard/#delete-dashboard
+func (c *Client) DeleteDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error {
+	if name == "" {
+		return errors.New("dashboard name must not be empty")
 	}
 
-	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", namespace, "dashboards", uid)
+	if err := c.storage.BackUpDashboard(ctx, namespace, name, dashboardJSON); err != nil {
+		return errors.Wrap(err, "backing up dashboard")
+	}
+
+	u := c.endpoint.JoinPath("apis", "dashboard.grafana.app", "v1beta1", "namespaces", namespace, "dashboards", name)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, u.String(), http.NoBody)
 	if err != nil {

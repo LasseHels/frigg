@@ -66,6 +66,7 @@ func TestNewConfig(t *testing.T) {
 						Repository: exampleRepository(t),
 						Branch:     "backup-branch",
 						Directory:  "archived-dashboards",
+						APIURL:     "https://github.example.com/api/v3",
 					},
 				},
 			},
@@ -273,6 +274,12 @@ func TestNewConfig(t *testing.T) {
 			configPath:     "testdata/empty_backup_repository.yaml",
 			expectedConfig: nil,
 			expectedError:  "loading configuration: parsing config file: repository must be in format 'owner/repo', got \"\"",
+		},
+		"invalid github api url": {
+			configPath:     "testdata/invalid_github_api_url.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Backup.GitHub.APIURL' Error:" +
+				"Field validation for 'APIURL' failed on the 'url' tag",
 		},
 	}
 

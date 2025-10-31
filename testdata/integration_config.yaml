@@ -21,3 +21,4 @@ prune:
 backup:
   github:
     repository: 'octocat/hello-world'
+    api_url: ${GITHUB_API_URL}
