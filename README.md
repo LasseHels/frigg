@@ -91,6 +91,10 @@ backup:
     # Directory within the repository where deleted dashboards will be stored (default: "deleted-dashboards").
     # Dashboards will be saved as "{directory}/{dashboard-namespace}/{dashboard-name}.json".
     directory: 'deleted-dashboards'
+    # GitHub API URL for GitHub Enterprise Server instances.
+    #
+    # The value must be a valid URL according to Go's url.Parse() function (default: "https://api.github.com/").
+    api_url: 'https://github.example.com/api/v3'
 ```
 
 ### Secrets File Structure

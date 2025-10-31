@@ -27,3 +27,4 @@ backup:
     repository: 'octocat/hello-world'
     branch: 'backup-branch'
     directory: 'archived-dashboards'
+    api_url: 'https://github.example.com/api/v3'

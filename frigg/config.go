@@ -122,9 +122,9 @@ func (c *Config) newGitHubClient(
 	logger *slog.Logger,
 ) (*github.Client, error) {
 	client := gogithub.NewClient(httpClient).WithAuthToken(secrets.Backup.GitHub.Token)
-	if githubAPIURL := os.Getenv("GITHUB_API_URL"); githubAPIURL != "" {
+	if c.Backup.GitHub.APIURL != "" {
 		var err error
-		client, err = client.WithEnterpriseURLs(githubAPIURL, githubAPIURL)
+		client, err = client.WithEnterpriseURLs(c.Backup.GitHub.APIURL, c.Backup.GitHub.APIURL)
 		if err != nil {
 			return nil, errors.Wrap(err, "setting GitHub API URL")
 		}
