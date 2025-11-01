@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -23,7 +24,7 @@ import (
 func TestFriggIntegration(t *testing.T) {
 	integrationtest.SkipIfShort(t)
 
-	var out bytes.Buffer
+	var out buffer
 
 	ctx, cancel := context.WithCancel(t.Context())
 	// Schedule a cancellation to ensure that the context is cancelled even if the test fails before the context is
@@ -297,4 +298,22 @@ func (l *lokiLogConsumer) Accept(log testcontainers.Log) {
 
 	err := l.loki.PushLogs(ctx, lokiLogs)
 	require.NoError(l.t, err)
+}
+
+// buffer is a thread-safe bytes.Buffer.
+type buffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *buffer) Write(p []byte) (n int, err error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *buffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
 }
