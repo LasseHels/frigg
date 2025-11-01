@@ -306,7 +306,7 @@ type buffer struct {
 	buf bytes.Buffer
 }
 
-func (b *buffer) Write(p []byte) (n int, err error) {
+func (b *buffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	return b.buf.Write(p)
