@@ -1,7 +1,13 @@
 name: Push
 
 on:
+  # Run on all pushes except tag pushes.
+  # See https://github.com/orgs/community/discussions/25615#discussioncomment-3248483.
   push:
+    branches:
+      - '**'
+    tags-ignore:
+      - '**'
 
 jobs:
   test:
