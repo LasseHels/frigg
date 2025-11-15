@@ -1,5 +1,5 @@
 package loki
 
 type Config struct {
-	Endpoint string `yaml:"endpoint" validate:"required,url"`
+	Endpoint string `yaml:"endpoint" json:"endpoint" validate:"required,url"`
 }

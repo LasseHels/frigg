@@ -21,10 +21,10 @@ import (
 // release is set through the linker at build time, generally from a git sha. Used for logging and error reporting.
 var release string
 
-// flagConfigFile is the flag that contains the path to Frigg's YAML configuration file.
+// flagConfigFile is the flag that contains the path to Frigg's configuration file.
 const flagConfigFile = "config.file"
 
-// flagSecretsFile is the flag that contains the path to Frigg's YAML secrets file.
+// flagSecretsFile is the flag that contains the path to Frigg's secrets file.
 const flagSecretsFile = "secrets.file"
 
 func main() {
@@ -36,8 +36,18 @@ func start() int {
 	defer stop()
 
 	var configPath, secretsPath string
-	flag.StringVar(&configPath, flagConfigFile, "", "Path to Frigg's YAML configuration file (required)")
-	flag.StringVar(&secretsPath, flagSecretsFile, "", "Path to Frigg's YAML secrets file (required)")
+	flag.StringVar(
+		&configPath,
+		flagConfigFile,
+		"",
+		"Path to Frigg's configuration file (.json, .yml, or .yaml) (required)",
+	)
+	flag.StringVar(
+		&secretsPath,
+		flagSecretsFile,
+		"",
+		"Path to Frigg's secrets file (.json, .yml, or .yaml) (required)",
+	)
 	flag.Parse()
 
 	if err := run(ctx, configPath, secretsPath, os.Stdout); err != nil {

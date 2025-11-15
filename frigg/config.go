@@ -2,10 +2,13 @@ package frigg
 
 import (
 	"bytes"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -23,25 +26,25 @@ import (
 )
 
 type Secrets struct {
-	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
-	Backup  BackupSecrets   `yaml:"backup" validate:"required"`
+	Grafana grafana.Secrets `yaml:"grafana" json:"grafana" validate:"required"`
+	Backup  BackupSecrets   `yaml:"backup" json:"backup" validate:"required"`
 }
 
 type BackupSecrets struct {
-	GitHub github.Secrets `yaml:"github" validate:"required"`
+	GitHub github.Secrets `yaml:"github" json:"github" validate:"required"`
 }
 
 type Config struct {
-	Log     log.Config          `yaml:"log"`
-	Server  server.Config       `yaml:"server"`
-	Loki    loki.Config         `yaml:"loki" validate:"required"`
-	Grafana grafana.Config      `yaml:"grafana" validate:"required"`
-	Prune   grafana.PruneConfig `yaml:"prune" validate:"required"`
-	Backup  BackupConfig        `yaml:"backup" validate:"required"`
+	Log     log.Config          `yaml:"log" json:"log"`
+	Server  server.Config       `yaml:"server" json:"server"`
+	Loki    loki.Config         `yaml:"loki" json:"loki" validate:"required"`
+	Grafana grafana.Config      `yaml:"grafana" json:"grafana" validate:"required"`
+	Prune   grafana.PruneConfig `yaml:"prune" json:"prune" validate:"required"`
+	Backup  BackupConfig        `yaml:"backup" json:"backup" validate:"required"`
 }
 
 type BackupConfig struct {
-	GitHub github.Config `yaml:"github" validate:"required"`
+	GitHub github.Config `yaml:"github" json:"github" validate:"required"`
 }
 
 // NewConfig creates a new Config with default values and loads configuration from the given path.
@@ -62,15 +65,17 @@ func NewConfig(path string) (*Config, error) {
 
 // NewSecrets creates a new Secrets from the given path.
 func NewSecrets(path string) (*Secrets, error) {
+	if err := validateFileExtension(path, "secrets"); err != nil {
+		return nil, err
+	}
+
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return nil, errors.Wrapf(err, "reading secrets file at path %q", path)
 	}
 
 	var secrets *Secrets
-	dec := yaml.NewDecoder(bytes.NewReader(buf))
-
-	if err := dec.Decode(&secrets); err != nil {
+	if err := unmarshalFile(path, buf, &secrets); err != nil {
 		return nil, errors.Wrap(err, "parsing secrets file")
 	}
 
@@ -93,8 +98,12 @@ func (c *Config) defaults() {
 	c.Backup.GitHub.Directory = "deleted-dashboards"
 }
 
-// load configuration from a YAML file at path.
+// load configuration from a file at path.
 func (c *Config) load(path string) error {
+	if err := validateFileExtension(path, "config"); err != nil {
+		return err
+	}
+
 	buf, err := os.ReadFile(path)
 	if err != nil {
 		return errors.Wrapf(err, "reading config file at path %q", path)
@@ -106,9 +115,7 @@ func (c *Config) load(path string) error {
 		return nil
 	}
 
-	dec := yaml.NewDecoder(bytes.NewReader(buf))
-
-	if err := dec.Decode(c); err != nil {
+	if err := unmarshalFile(path, buf, c); err != nil {
 		return errors.Wrap(err, "parsing config file")
 	}
 
@@ -228,4 +235,81 @@ func validate(s any) error {
 	}
 
 	return nil
+}
+
+// validateFileExtension checks that the file has a valid extension.
+func validateFileExtension(path, fileType string) error {
+	ext := filepath.Ext(path)
+	if ext == "" {
+		return errors.Errorf("invalid file extension \"\" for %s file, expected .json, .yml, or .yaml", fileType)
+	}
+
+	if ext != ".json" && ext != ".yml" && ext != ".yaml" {
+		return errors.Errorf("invalid file extension %q for %s file, expected .json, .yml, or .yaml", ext, fileType)
+	}
+
+	return nil
+}
+
+// unmarshalFile unmarshals a file based on its extension.
+func unmarshalFile(path string, buf []byte, target any) error {
+	ext := filepath.Ext(path)
+
+	switch ext {
+	case ".json":
+		var raw map[string]any
+		if err := json.Unmarshal(buf, &raw); err != nil {
+			return err
+		}
+
+		convertDurationsInMap(raw)
+
+		fixedJSON, err := json.Marshal(raw)
+		if err != nil {
+			return err
+		}
+
+		return json.Unmarshal(fixedJSON, target)
+	case ".yml", ".yaml":
+		dec := yaml.NewDecoder(bytes.NewReader(buf))
+		return dec.Decode(target)
+	default:
+		return errors.Errorf("unsupported file extension %q", ext)
+	}
+}
+
+// convertDurationsInMap recursively converts duration strings to nanoseconds in a map.
+func convertDurationsInMap(m map[string]any) {
+	for k, v := range m {
+		switch val := v.(type) {
+		case string:
+			if isDurationString(val) {
+				if d, err := time.ParseDuration(val); err == nil {
+					m[k] = d.Nanoseconds()
+				}
+			}
+		case map[string]any:
+			convertDurationsInMap(val)
+		case []any:
+			for _, item := range val {
+				if itemMap, ok := item.(map[string]any); ok {
+					convertDurationsInMap(itemMap)
+				}
+			}
+		}
+	}
+}
+
+// isDurationString checks if a string looks like a duration (e.g., "5m", "1h30m").
+func isDurationString(s string) bool {
+	if s == "" {
+		return false
+	}
+
+	if strings.Contains(s, "/") || strings.Contains(s, ":") {
+		return false
+	}
+
+	_, err := time.ParseDuration(s)
+	return err == nil
 }

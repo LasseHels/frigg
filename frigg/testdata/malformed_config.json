@@ -1,0 +1,6 @@
+{
+  "server": {
+    "host": "example.com",
+    "port": 8080
+  },
+  "missing_closing_brace": true

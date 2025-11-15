@@ -1,20 +1,21 @@
 package github
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
 )
 
 type Secrets struct {
-	Token string `yaml:"token" validate:"required"`
+	Token string `yaml:"token" json:"token" validate:"required"`
 }
 
 type Config struct {
-	Repository Repository `yaml:"repository" validate:"required"`
-	Branch     string     `yaml:"branch" validate:"required"`
-	Directory  string     `yaml:"directory" validate:"required"`
-	APIURL     string     `yaml:"api_url" validate:"omitempty,url"` //nolint:revive // omitempty is valid for validator
+	Repository Repository `yaml:"repository" json:"repository" validate:"required"`
+	Branch     string     `yaml:"branch" json:"branch" validate:"required"`
+	Directory  string     `yaml:"directory" json:"directory" validate:"required"`
+	APIURL     string     `yaml:"api_url" json:"api_url" validate:"omitempty,url"` //nolint:lll,revive // omitempty is valid for validator
 }
 
 // Repository represents a GitHub repository in "owner/repo" format.
@@ -59,7 +60,19 @@ func (r *Repository) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
+	return r.unmarshal(s)
+}
 
+// UnmarshalJSON implements json.Unmarshaler for parsing "owner/repo" format.
+func (r *Repository) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+	return r.unmarshal(s)
+}
+
+func (r *Repository) unmarshal(s string) error {
 	parts := strings.Split(s, "/")
 	if len(parts) != 2 {
 		return fmt.Errorf("repository must be in format 'owner/repo', got %q", s)

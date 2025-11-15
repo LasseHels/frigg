@@ -4,16 +4,24 @@ Frigg analyses Grafana dashboard usage and deletes unused dashboards
 
 ## Configuration
 
-Frigg is configured using a YAML configuration file and a YAML secrets file. The paths to these files are provided using the `-config.file` and `-secrets.file` flags when starting Frigg:
+Frigg is configured using a configuration file and a secrets file. Both files support both JSON and YAML. The paths to
+these files are provided using the `-config.file` and `-secrets.file` flags when starting Frigg:
 ```bash
 frigg -config.file=/path/to/config.yaml -secrets.file=/path/to/secrets.yaml
 ```
 
 Both flags are required. Frigg will fail to start if either flag is missing or points to a non-existent file.
 
+### File Format Support
+
+Frigg supports three file extensions for both configuration and secrets files:
+- `.json` - JSON format
+- `.yml` - YAML format
+- `.yaml` - YAML format
+
 ### Configuration File Structure
 
-Below is a complete example of Frigg's configuration file structure:
+Below is a complete example of Frigg's configuration file structure in YAML format:
 ```yaml
 log:
   # The log level to use (default: "INFO").
@@ -97,7 +105,47 @@ backup:
     api_url: 'https://github.example.com/api/v3'
 ```
 
+The same configuration in JSON format:
+```json
+{
+  "log": {
+    "level": "INFO"
+  },
+  "server": {
+    "host": "localhost",
+    "port": 8080
+  },
+  "grafana": {
+    "endpoint": "https://grafana.example.com"
+  },
+  "prune": {
+    "dry": true,
+    "interval": "10m",
+    "ignored_users": [
+      "some-admin",
+      "a-service-account"
+    ],
+    "period": "1440h",
+    "labels": {
+      "app": "grafana",
+      "env": "production"
+    },
+    "lower_threshold": 10
+  },
+  "backup": {
+    "github": {
+      "repository": "octocat/hello-world",
+      "branch": "main",
+      "directory": "deleted-dashboards",
+      "api_url": "https://github.example.com/api/v3"
+    }
+  }
+}
+```
+
 ### Secrets File Structure
+
+YAML format:
 
 ```yaml
 grafana:
@@ -134,14 +182,44 @@ backup:
         token: 'ghp_exampletoken123'
 ```
 
+The same secrets in JSON format:
+```json
+{
+  "grafana": {
+    "tokens": {
+      "default": "token-for-the-default-namespace",
+      "org-1": "token-for-the-org-1-namespace",
+      "stacks-5": "token-for-the-stacks-5-namespace"
+    }
+  },
+  "backup": {
+    "github": {
+      "token": "ghp_exampletoken123"
+    }
+  }
+}
+```
+
 ### Environment Variable Expansion
 
-Frigg's YAML configuration supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) in the configuration file.
+Frigg's configuration file supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) for both JSON and YAML formats.
 Use `${VAR_NAME}` syntax to include environment variables:
+
+YAML example:
 ```yaml
 server:
   host: ${FRIGG_HOST}
   port: 9000
+```
+
+JSON example:
+```json
+{
+  "server": {
+    "host": "${FRIGG_HOST}",
+    "port": 9000
+  }
+}
 ```
 
 If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the server host.
