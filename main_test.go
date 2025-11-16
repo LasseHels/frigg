@@ -35,8 +35,8 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		err := run(ctx, "does/not/exist", "testdata/valid_secrets.yaml", io.Discard)
-		expectedErr := `reading configuration: loading configuration: invalid file extension "" for ` +
-			`config file, expected .json, .yml, or .yaml`
+		expectedErr := `reading configuration: loading configuration: reading config file at path "does/not/exist": ` +
+			`open does/not/exist: no such file or directory`
 		require.EqualError(t, err, expectedErr)
 	})
 

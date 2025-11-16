@@ -158,96 +158,10 @@ func TestNewConfig(t *testing.T) {
 			expectedConfig: nil,
 			expectedError:  "loading configuration: parsing config file: yaml: line 1: did not find expected key",
 		},
-		"invalid extension for config": {
-			configPath:     "testdata/invalid_extension_config.txt",
-			expectedConfig: nil,
-			expectedError: `loading configuration: invalid file extension ".txt" for config file, ` +
-				`expected .json, .yml, or .yaml`,
-		},
-		"no extension for config": {
-			configPath:     "testdata/no_extension_config",
-			expectedConfig: nil,
-			expectedError:  `loading configuration: invalid file extension "" for config file, expected .json, .yml, or .yaml`,
-		},
-		"valid json config": {
-			configPath: "testdata/valid_config.json",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelError,
-				},
-				Server: server.Config{
-					Host: "pomelo.com",
-					Port: 9898,
-				},
-				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
-				},
-				Prune: grafana.PruneConfig{
-					Dry:            false,
-					Interval:       5 * time.Minute,
-					IgnoredUsers:   []string{"admin"},
-					Period:         720 * time.Hour,
-					Labels:         map[string]string{"app": "grafana", "env": "test"},
-					LowerThreshold: 50,
-				},
-				Backup: frigg.BackupConfig{
-					GitHub: github.Config{
-						Repository: exampleRepository(t),
-						Branch:     "backup-branch",
-						Directory:  "archived-dashboards",
-						APIURL:     "https://github.example.com/api/v3",
-					},
-				},
-			},
-			expectedError: "",
-		},
-		"valid yml extension config": {
-			configPath: "testdata/valid_config.yaml",
-			expectedConfig: &frigg.Config{
-				Log: log.Config{
-					Level: slog.LevelError,
-				},
-				Server: server.Config{
-					Host: "pomelo.com",
-					Port: 9898,
-				},
-				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
-				},
-				Grafana: grafana.Config{
-					Endpoint: "http://example.com",
-				},
-				Prune: grafana.PruneConfig{
-					Dry:            false,
-					Interval:       5 * time.Minute,
-					IgnoredUsers:   []string{"admin"},
-					Period:         720 * time.Hour,
-					Labels:         map[string]string{"app": "grafana", "env": "test"},
-					LowerThreshold: 50,
-				},
-				Backup: frigg.BackupConfig{
-					GitHub: github.Config{
-						Repository: exampleRepository(t),
-						Branch:     "backup-branch",
-						Directory:  "archived-dashboards",
-						APIURL:     "https://github.example.com/api/v3",
-					},
-				},
-			},
-			expectedError: "",
-		},
-		"malformed json config": {
-			configPath:     "testdata/malformed_config.json",
-			expectedConfig: nil,
-			expectedError:  "loading configuration: parsing config file: unexpected end of JSON input",
-		},
 		"empty path": {
 			configPath:     "",
 			expectedConfig: nil,
-			expectedError:  `loading configuration: invalid file extension "" for config file, expected .json, .yml, or .yaml`,
+			expectedError:  `loading configuration: reading config file at path "": open : no such file or directory`,
 		},
 		"file not found": {
 			configPath:     "testdata/nonexistent.yaml",
@@ -422,45 +336,6 @@ func TestNewConfig(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, expectedConfig, cfg)
 	})
-
-	t.Run("expands environment variables in json config", func(t *testing.T) {
-		t.Setenv("FRIGG_HOST", "banana.com")
-		expectedConfig := &frigg.Config{
-			Log: log.Config{
-				Level: slog.LevelInfo,
-			},
-			Server: server.Config{
-				Host: "banana.com",
-				Port: 1111,
-			},
-			Loki: loki.Config{
-				Endpoint: "http://loki.example.com",
-			},
-			Grafana: grafana.Config{
-				Endpoint: "http://example.com",
-			},
-			Prune: grafana.PruneConfig{
-				Dry:      true,
-				Interval: 10 * time.Minute,
-				Period:   720 * time.Hour,
-				Labels: map[string]string{
-					"app": "grafana",
-				},
-				LowerThreshold: 10,
-			},
-			Backup: frigg.BackupConfig{
-				GitHub: github.Config{
-					Repository: exampleRepository(t),
-					Branch:     "main",
-					Directory:  "deleted-dashboards",
-				},
-			},
-		}
-
-		cfg, err := frigg.NewConfig("testdata/env_expansion_config.json")
-		require.NoError(t, err)
-		assert.Equal(t, expectedConfig, cfg)
-	})
 }
 
 func TestNewSecrets(t *testing.T) {
@@ -542,12 +417,14 @@ func TestNewSecrets(t *testing.T) {
 		"invalid extension for secrets": {
 			secretsPath:     "testdata/invalid_extension_secrets.xml",
 			expectedSecrets: nil,
-			expectedError:   `invalid file extension ".xml" for secrets file, expected .json, .yml, or .yaml`,
+			expectedError: `parsing secrets file: unsupported file extension ".xml" for file at path` +
+				` "testdata/invalid_extension_secrets.xml", supported extensions are .json, .yml and .yaml`,
 		},
 		"no extension for secrets": {
 			secretsPath:     "testdata/no_extension_config",
 			expectedSecrets: nil,
-			expectedError:   `invalid file extension "" for secrets file, expected .json, .yml, or .yaml`,
+			expectedError: `parsing secrets file: unsupported file extension "" for file at path` +
+				` "testdata/no_extension_config", supported extensions are .json, .yml and .yaml`,
 		},
 		"valid json secrets": {
 			secretsPath: "testdata/valid_secrets.json",

@@ -3,16 +3,16 @@ package grafana
 import "time"
 
 type Config struct {
-	Endpoint string `yaml:"endpoint" json:"endpoint" validate:"required,url"`
+	Endpoint string `yaml:"endpoint" validate:"required,url"`
 }
 
 type PruneConfig struct {
-	Dry            bool              `yaml:"dry" json:"dry"`
-	Interval       time.Duration     `yaml:"interval" json:"interval"`
-	IgnoredUsers   []string          `yaml:"ignored_users" json:"ignored_users"`
-	Period         time.Duration     `yaml:"period" json:"period" validate:"required"`
-	Labels         map[string]string `yaml:"labels" json:"labels" validate:"required"`
-	LowerThreshold int               `yaml:"lower_threshold" json:"lower_threshold" validate:"min=0"`
+	Dry            bool              `yaml:"dry"`
+	Interval       time.Duration     `yaml:"interval"`
+	IgnoredUsers   []string          `yaml:"ignored_users"`
+	Period         time.Duration     `yaml:"period" validate:"required"`
+	Labels         map[string]string `yaml:"labels" validate:"required"`
+	LowerThreshold int               `yaml:"lower_threshold" validate:"min=0"`
 }
 
 type Secrets struct {

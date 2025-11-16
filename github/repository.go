@@ -12,10 +12,10 @@ type Secrets struct {
 }
 
 type Config struct {
-	Repository Repository `yaml:"repository" json:"repository" validate:"required"`
-	Branch     string     `yaml:"branch" json:"branch" validate:"required"`
-	Directory  string     `yaml:"directory" json:"directory" validate:"required"`
-	APIURL     string     `yaml:"api_url" json:"api_url" validate:"omitempty,url"` //nolint:lll,revive // omitempty is valid for validator
+	Repository Repository `yaml:"repository" validate:"required"`
+	Branch     string     `yaml:"branch" validate:"required"`
+	Directory  string     `yaml:"directory" validate:"required"`
+	APIURL     string     `yaml:"api_url" validate:"omitempty,url"` //nolint:revive // omitempty is valid for validator
 }
 
 // Repository represents a GitHub repository in "owner/repo" format.

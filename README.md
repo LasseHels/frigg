@@ -12,13 +12,6 @@ frigg -config.file=/path/to/config.yaml -secrets.file=/path/to/secrets.yaml
 
 Both flags are required. Frigg will fail to start if either flag is missing or points to a non-existent file.
 
-### File Format Support
-
-Frigg supports three file extensions for both configuration and secrets files:
-- `.json` - JSON format
-- `.yml` - YAML format
-- `.yaml` - YAML format
-
 ### Configuration File Structure
 
 Below is a complete example of Frigg's configuration file structure in YAML format:
@@ -105,48 +98,12 @@ backup:
     api_url: 'https://github.example.com/api/v3'
 ```
 
-The same configuration in JSON format:
-```json
-{
-  "log": {
-    "level": "INFO"
-  },
-  "server": {
-    "host": "localhost",
-    "port": 8080
-  },
-  "grafana": {
-    "endpoint": "https://grafana.example.com"
-  },
-  "prune": {
-    "dry": true,
-    "interval": "10m",
-    "ignored_users": [
-      "some-admin",
-      "a-service-account"
-    ],
-    "period": "1440h",
-    "labels": {
-      "app": "grafana",
-      "env": "production"
-    },
-    "lower_threshold": 10
-  },
-  "backup": {
-    "github": {
-      "repository": "octocat/hello-world",
-      "branch": "main",
-      "directory": "deleted-dashboards",
-      "api_url": "https://github.example.com/api/v3"
-    }
-  }
-}
-```
-
 ### Secrets File Structure
 
-YAML format:
+Frigg's secrets file supports both the YAML and JSON formats. The extension of the secrets file must be `.json`, `.yml`
+or `.yaml`.
 
+YAML format:
 ```yaml
 grafana:
     # Tokens used to authenticate with Grafana's API for specific namespaces. This field is a map where keys are
@@ -202,24 +159,13 @@ The same secrets in JSON format:
 
 ### Environment Variable Expansion
 
-Frigg's configuration file supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) for both JSON and YAML formats.
+Frigg's YAML configuration file supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv).
 Use `${VAR_NAME}` syntax to include environment variables:
 
-YAML example:
 ```yaml
 server:
   host: ${FRIGG_HOST}
   port: 9000
-```
-
-JSON example:
-```json
-{
-  "server": {
-    "host": "${FRIGG_HOST}",
-    "port": 9000
-  }
-}
 ```
 
 If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the server host.
