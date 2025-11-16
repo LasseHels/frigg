@@ -414,6 +414,55 @@ func TestNewSecrets(t *testing.T) {
 			expectedError: "validating secrets: Key: 'Secrets.Backup' Error:" +
 				"Field validation for 'Backup' failed on the 'required' tag",
 		},
+		"invalid extension for secrets": {
+			secretsPath:     "testdata/invalid_extension_secrets.xml",
+			expectedSecrets: nil,
+			expectedError: `parsing secrets file: unsupported file extension ".xml" for file at path` +
+				` "testdata/invalid_extension_secrets.xml", supported extensions are .json, .yml and .yaml`,
+		},
+		"no extension for secrets": {
+			secretsPath:     "testdata/no_extension_config",
+			expectedSecrets: nil,
+			expectedError: `parsing secrets file: unsupported file extension "" for file at path` +
+				` "testdata/no_extension_config", supported extensions are .json, .yml and .yaml`,
+		},
+		"valid json secrets": {
+			secretsPath: "testdata/valid_secrets.json",
+			expectedSecrets: &frigg.Secrets{
+				Grafana: grafana.Secrets{
+					Tokens: map[string]string{
+						"default": "example-valid-token",
+					},
+				},
+				Backup: frigg.BackupSecrets{
+					GitHub: github.Secrets{
+						Token: "ghp_exampletoken123",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"valid yml extension secrets": {
+			secretsPath: "testdata/valid_secrets.yaml",
+			expectedSecrets: &frigg.Secrets{
+				Grafana: grafana.Secrets{
+					Tokens: map[string]string{
+						"default": "example-valid-token",
+					},
+				},
+				Backup: frigg.BackupSecrets{
+					GitHub: github.Secrets{
+						Token: "ghp_exampletoken123",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"malformed json secrets": {
+			secretsPath:     "testdata/malformed_secrets.json",
+			expectedSecrets: nil,
+			expectedError:   "parsing secrets file: invalid character '\"' after object key:value pair",
+		},
 	}
 
 	for name, tt := range tests {

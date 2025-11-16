@@ -35,8 +35,8 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		err := run(ctx, "does/not/exist", "testdata/valid_secrets.yaml", io.Discard)
-		expectedErr := `reading configuration: loading configuration: reading config file at path "does/not/exist":` +
-			` open does/not/exist: no such file or directory`
+		expectedErr := `reading configuration: loading configuration: reading config file at path "does/not/exist": ` +
+			`open does/not/exist: no such file or directory`
 		require.EqualError(t, err, expectedErr)
 	})
 
@@ -44,8 +44,8 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 
 		err := run(ctx, "testdata/valid_config.yaml", "does/not/exist", io.Discard)
-		expectedErr := `reading secrets: reading secrets file at path "does/not/exist":` +
-			` open does/not/exist: no such file or directory`
+		expectedErr := `reading secrets: reading secrets file at path "does/not/exist": ` +
+			`open does/not/exist: no such file or directory`
 		require.EqualError(t, err, expectedErr)
 	})
 }

@@ -4,7 +4,8 @@ Frigg analyses Grafana dashboard usage and deletes unused dashboards
 
 ## Configuration
 
-Frigg is configured using a YAML configuration file and a YAML secrets file. The paths to these files are provided using the `-config.file` and `-secrets.file` flags when starting Frigg:
+Frigg is configured using a configuration file and a secrets file. The paths to these files are provided using the
+`-config.file` and `-secrets.file` flags when starting Frigg:
 ```bash
 frigg -config.file=/path/to/config.yaml -secrets.file=/path/to/secrets.yaml
 ```
@@ -13,7 +14,7 @@ Both flags are required. Frigg will fail to start if either flag is missing or p
 
 ### Configuration File Structure
 
-Below is a complete example of Frigg's configuration file structure:
+Below is a complete example of Frigg's configuration file structure in YAML format:
 ```yaml
 log:
   # The log level to use (default: "INFO").
@@ -99,6 +100,10 @@ backup:
 
 ### Secrets File Structure
 
+Frigg's secrets file supports both the YAML and JSON formats. The extension of the secrets file must be `.json`, `.yml`
+or `.yaml`.
+
+YAML format:
 ```yaml
 grafana:
     # Tokens used to authenticate with Grafana's API for specific namespaces. This field is a map where keys are
@@ -134,10 +139,29 @@ backup:
         token: 'ghp_exampletoken123'
 ```
 
+The same secrets in JSON format:
+```json
+{
+  "grafana": {
+    "tokens": {
+      "default": "token-for-the-default-namespace",
+      "org-1": "token-for-the-org-1-namespace",
+      "stacks-5": "token-for-the-stacks-5-namespace"
+    }
+  },
+  "backup": {
+    "github": {
+      "token": "ghp_exampletoken123"
+    }
+  }
+}
+```
+
 ### Environment Variable Expansion
 
-Frigg's YAML configuration supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv) in the configuration file.
+Frigg's YAML configuration file supports [environment variable expansion](https://pkg.go.dev/os#ExpandEnv).
 Use `${VAR_NAME}` syntax to include environment variables:
+
 ```yaml
 server:
   host: ${FRIGG_HOST}

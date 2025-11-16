@@ -2,10 +2,12 @@ package frigg
 
 import (
 	"bytes"
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/go-playground/validator/v10"
@@ -23,12 +25,12 @@ import (
 )
 
 type Secrets struct {
-	Grafana grafana.Secrets `yaml:"grafana" validate:"required"`
-	Backup  BackupSecrets   `yaml:"backup" validate:"required"`
+	Grafana grafana.Secrets `yaml:"grafana" json:"grafana" validate:"required"`
+	Backup  BackupSecrets   `yaml:"backup" json:"backup" validate:"required"`
 }
 
 type BackupSecrets struct {
-	GitHub github.Secrets `yaml:"github" validate:"required"`
+	GitHub github.Secrets `yaml:"github" json:"github" validate:"required"`
 }
 
 type Config struct {
@@ -68,9 +70,7 @@ func NewSecrets(path string) (*Secrets, error) {
 	}
 
 	var secrets *Secrets
-	dec := yaml.NewDecoder(bytes.NewReader(buf))
-
-	if err := dec.Decode(&secrets); err != nil {
+	if err := unmarshalFile(path, buf, &secrets); err != nil {
 		return nil, errors.Wrap(err, "parsing secrets file")
 	}
 
@@ -228,4 +228,23 @@ func validate(s any) error {
 	}
 
 	return nil
+}
+
+// unmarshalFile based on its extension.
+func unmarshalFile(path string, buf []byte, target any) error {
+	ext := filepath.Ext(path)
+
+	switch ext {
+	case ".json":
+		return json.Unmarshal(buf, target)
+	case ".yml", ".yaml":
+		dec := yaml.NewDecoder(bytes.NewReader(buf))
+		return dec.Decode(target)
+	default:
+		return errors.Errorf(
+			"unsupported file extension %q for file at path %q, supported extensions are .json, .yml and .yaml",
+			ext,
+			path,
+		)
+	}
 }

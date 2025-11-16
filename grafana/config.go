@@ -16,5 +16,5 @@ type PruneConfig struct {
 }
 
 type Secrets struct {
-	Tokens map[string]string `yaml:"tokens" validate:"required,min=1,dive,keys,required,endkeys,required"`
+	Tokens map[string]string `yaml:"tokens" json:"tokens" validate:"required,min=1,dive,keys,required,endkeys,required"`
 }

@@ -7,7 +7,7 @@ import (
 )
 
 type Secrets struct {
-	Token string `yaml:"token" validate:"required"`
+	Token string `yaml:"token" json:"token" validate:"required"`
 }
 
 type Config struct {
