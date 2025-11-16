@@ -59,6 +59,7 @@ func (r *Repository) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
+
 	parts := strings.Split(s, "/")
 	if len(parts) != 2 {
 		return fmt.Errorf("repository must be in format 'owner/repo', got %q", s)
