@@ -1,7 +1,6 @@
 package github
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -60,19 +59,6 @@ func (r *Repository) UnmarshalYAML(unmarshal func(any) error) error {
 	if err := unmarshal(&s); err != nil {
 		return err
 	}
-	return r.unmarshal(s)
-}
-
-// UnmarshalJSON implements json.Unmarshaler for parsing "owner/repo" format.
-func (r *Repository) UnmarshalJSON(data []byte) error {
-	var s string
-	if err := json.Unmarshal(data, &s); err != nil {
-		return err
-	}
-	return r.unmarshal(s)
-}
-
-func (r *Repository) unmarshal(s string) error {
 	parts := strings.Split(s, "/")
 	if len(parts) != 2 {
 		return fmt.Errorf("repository must be in format 'owner/repo', got %q", s)
