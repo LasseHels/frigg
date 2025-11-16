@@ -4,8 +4,8 @@ Frigg analyses Grafana dashboard usage and deletes unused dashboards
 
 ## Configuration
 
-Frigg is configured using a configuration file and a secrets file. Both files support both JSON and YAML. The paths to
-these files are provided using the `-config.file` and `-secrets.file` flags when starting Frigg:
+Frigg is configured using a configuration file and a secrets file. The paths to these files are provided using the
+`-config.file` and `-secrets.file` flags when starting Frigg:
 ```bash
 frigg -config.file=/path/to/config.yaml -secrets.file=/path/to/secrets.yaml
 ```
