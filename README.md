@@ -1,6 +1,14 @@
 # Frigg
 
-Frigg analyses Grafana dashboard usage and deletes unused dashboards
+Frigg analyses Grafana dashboard usage and deletes unused dashboards.
+
+## How It Works
+
+Each time a user views a Grafana dashboard, Grafana emits a log line. Frigg queries these logs from Loki to determine
+which dashboards have been viewed within a configurable time period. Dashboards that have not been viewed within this
+period are considered unused.
+
+![Frigg's architecture](/img/frigg-arch.svg)
 
 ## Configuration
 
