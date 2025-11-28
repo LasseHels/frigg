@@ -20,12 +20,14 @@ type httpClient interface {
 
 type ClientOptions struct {
 	Endpoint   string
+	TenantID   string
 	HTTPClient httpClient
 	Logger     *slog.Logger
 }
 
 type Client struct {
 	endpoint string
+	tenantID string
 	client   httpClient
 	logger   *slog.Logger
 }
@@ -33,6 +35,7 @@ type Client struct {
 func NewClient(opts ClientOptions) *Client {
 	return &Client{
 		endpoint: opts.Endpoint,
+		tenantID: opts.TenantID,
 		client:   opts.HTTPClient,
 		logger:   opts.Logger,
 	}
@@ -100,6 +103,10 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
 		return nil, errors.Wrap(err, "creating request")
+	}
+
+	if c.tenantID != "" {
+		req.Header.Set("X-Scope-OrgID", c.tenantID)
 	}
 
 	resp, err := c.client.Do(req)

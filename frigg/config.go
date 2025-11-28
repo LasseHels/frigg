@@ -158,6 +158,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 
 	lokiClient := loki.NewClient(loki.ClientOptions{
 		Endpoint:   c.Loki.Endpoint,
+		TenantID:   c.Loki.TenantID,
 		HTTPClient: httpClient,
 		Logger:     logger,
 	})

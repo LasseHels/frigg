@@ -46,6 +46,21 @@ grafana:
     # Required.
     endpoint: 'https://grafana.example.com'
 
+loki:
+    # Endpoint where Loki can be reached. This endpoint is used to query Grafana dashboard usage logs.
+    # Frigg automatically appends API path elements to this endpoint and expects the value of the configuration option
+    # to be the base URL of the Loki instance.
+    #
+    # The value of endpoint must be a valid URL according to Go's url.Parse() function.
+    #
+    # Required.
+    endpoint: 'https://loki.example.com'
+    # Tenant ID for multi-tenant Loki deployments. When set, Frigg includes the X-Scope-OrgID header in all Loki
+    # requests. See https://grafana.com/docs/loki/v3.6.x/operations/multi-tenancy.
+    #
+    # Optional.
+    tenant_id: 'my-tenant'
+
 prune:
   # If dry is set to true, the dashboard pruner will only log unused dashboards instead of deleting them (default: true).
   dry: true

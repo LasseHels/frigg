@@ -16,11 +16,13 @@ import (
 )
 
 type mockHTTPClient struct {
-	response *http.Response
-	err      error
+	response    *http.Response
+	err         error
+	lastRequest *http.Request
 }
 
-func (m *mockHTTPClient) Do(_ *http.Request) (*http.Response, error) {
+func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
+	m.lastRequest = req
 	return m.response, m.err
 }
 
@@ -197,6 +199,65 @@ func TestClient_QueryRange(t *testing.T) {
 		assert.Equal(t, "log message 2", logs[1].Message())
 		assert.Equal(t, time.Date(2021, 1, 1, 0, 0, 1, 0, time.UTC), logs[1].Timestamp())
 		assert.Equal(t, map[string]string{"app": "test", "env": "prod"}, logs[1].Stream())
+	})
+
+	t.Run("sets X-Scope-OrgID header when tenant ID is configured", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &mockHTTPClient{
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"status": "success",
+					"data": {
+						"resultType": "streams",
+						"result": []
+					}
+				}`)),
+			},
+		}
+
+		client := loki.NewClient(loki.ClientOptions{
+			Endpoint:   "http://localhost:1234",
+			TenantID:   "my-tenant",
+			HTTPClient: mock,
+			Logger:     slog.Default(),
+		})
+
+		_, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
+		require.NoError(t, err)
+
+		require.NotNil(t, mock.lastRequest)
+		assert.Equal(t, "my-tenant", mock.lastRequest.Header.Get("X-Scope-OrgID"))
+	})
+
+	t.Run("does not set X-Scope-OrgID header when tenant ID is empty", func(t *testing.T) {
+		t.Parallel()
+
+		mock := &mockHTTPClient{
+			response: &http.Response{
+				StatusCode: http.StatusOK,
+				Body: io.NopCloser(strings.NewReader(`{
+					"status": "success",
+					"data": {
+						"resultType": "streams",
+						"result": []
+					}
+				}`)),
+			},
+		}
+
+		client := loki.NewClient(loki.ClientOptions{
+			Endpoint:   "http://localhost:1234",
+			HTTPClient: mock,
+			Logger:     slog.Default(),
+		})
+
+		_, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
+		require.NoError(t, err)
+
+		require.NotNil(t, mock.lastRequest)
+		assert.Empty(t, mock.lastRequest.Header.Get("X-Scope-OrgID"))
 	})
 }
 
