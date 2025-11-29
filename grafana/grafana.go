@@ -155,15 +155,29 @@ type DashboardKey struct {
 }
 
 // extractPathVariables from a string in the format
-// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid" or
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid/dto".
+//
+// The former path comes from requests to Grafana's [Get Dashboard] API endpoint. The latter path comes from users
+// viewing dashboards in the Grafana UI, which [makes a request to Grafana's internal /dto endpoint] to fetch dashboard
+// data.
 //
 // For some reason that is not fully clear to me, the path parameter is called :uid, but it actually refers to the
-// dashboard's name. See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-.
+// dashboard's name. See [Name].
 //
 // A dashboard in Grafana v12 is uniquely identified by its combined name and namespace.
 //
-// See also https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure.
+// See also [API Path Structure].
+//
+// [Get Dashboard]: https://grafana.com/docs/grafana/v12.2/developer-resources/api-reference/http-api/dashboard/#get-dashboard
+// [makes a request to Grafana's internal /dto endpoint]: https://github.com/grafana/grafana/blob/v12.2.0/public/app/features/dashboard/api/v2.ts#L46
+// [Name]: https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-
+// [API Path Structure]: https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure
+//
+//nolint:lll
 func extractPathVariables(path string) (DashboardKey, error) {
+	path = strings.TrimSuffix(path, "/dto")
+
 	pathParts := strings.Split(path, "/")
 	expectedFormat := "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"
 	err := fmt.Errorf("unexpected path format: %q, expected format %q", path, expectedFormat)
