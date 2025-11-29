@@ -259,7 +259,7 @@ func (g *Grafana) getDashboard(t assert.TestingT, apiKey, namespace, name string
 // ViewDashboardInUI simulates viewing a dashboard in the Grafana UI by calling the /dto endpoint.
 // When a user views a dashboard in the Grafana web interface, the frontend JavaScript makes an API call
 // to the /dto endpoint to fetch the dashboard data. This method simulates that API call.
-func (g *Grafana) ViewDashboardInUI(t assert.TestingT, apiKey, namespace, name string) int {
+func (g *Grafana) ViewDashboardInUI(t testing.TB, apiKey, namespace, name string) {
 	url := fmt.Sprintf(
 		"http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/%s/dashboards/%s/dto",
 		g.host,
@@ -272,16 +272,8 @@ func (g *Grafana) ViewDashboardInUI(t assert.TestingT, apiKey, namespace, name s
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
 	assert.NoError(t, err) //nolint:testifylint
-
 	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-
-	resp, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err) //nolint:testifylint
-	defer func() {
-		assert.NoError(t, resp.Body.Close())
-	}()
-
-	return resp.StatusCode
+	_ = do(t, req, http.StatusOK)
 }
 
 func do(t testing.TB, req *http.Request, expectedStatus int) []byte {
