@@ -172,7 +172,9 @@ type DashboardKey struct {
 // [Get Dashboard]: https://grafana.com/docs/grafana/v12.2/developer-resources/api-reference/http-api/dashboard/#get-dashboard
 // [makes a request to Grafana's internal /dto endpoint]: https://github.com/grafana/grafana/blob/v12.2.0/public/app/features/dashboard/api/v2.ts#L46
 // [Name]: https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-
-// [API Path Structure]:  https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure
+// [API Path Structure]: https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure
+//
+//nolint:lll
 func extractPathVariables(path string) (DashboardKey, error) {
 	// Strip the /dto suffix if present.
 	path = strings.TrimSuffix(path, "/dto")
