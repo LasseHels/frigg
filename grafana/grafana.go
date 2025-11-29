@@ -155,7 +155,8 @@ type DashboardKey struct {
 }
 
 // extractPathVariables from a string in the format
-// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid".
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid" or
+// "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid/dto".
 //
 // For some reason that is not fully clear to me, the path parameter is called :uid, but it actually refers to the
 // dashboard's name. See https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#name-.
@@ -164,6 +165,9 @@ type DashboardKey struct {
 //
 // See also https://grafana.com/docs/grafana/v12.0/developers/http_api/apis/#api-path-structure.
 func extractPathVariables(path string) (DashboardKey, error) {
+	// Strip the /dto suffix if present.
+	path = strings.TrimSuffix(path, "/dto")
+
 	pathParts := strings.Split(path, "/")
 	expectedFormat := "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"
 	err := fmt.Errorf("unexpected path format: %q, expected format %q", path, expectedFormat)

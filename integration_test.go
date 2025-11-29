@@ -58,6 +58,7 @@ func TestFriggIntegration(t *testing.T) {
 		assert.EventuallyWithT(t, func(collect *assert.CollectT) {
 			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "unuseddashboard")
 			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "useddashboard")
+			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "useddashboardapi")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "ignoreduserdashboard")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
 		}, time.Second*10, time.Millisecond*100)
@@ -76,15 +77,15 @@ func TestFriggIntegration(t *testing.T) {
 
 		expectedBackups := map[string]string{
 			"default/ignoreduserdashboard": `{"message":"Back up deleted Grafana dashboard default/ignoreduserdashboard",` +
-				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQyLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
 				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJpZ25vcmVkdXNlcmRhc2hib2FyZCJ9"` +
 				`,"branch":"main"}`,
 			"default/unuseddashboard": `{"message":"Back up deleted Grafana dashboard default/unuseddashboard",` +
-				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQyLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
 				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJ1bnVzZWRkYXNoYm9hcmQifQ=="` +
 				`,"branch":"main"}`,
 			"org-2/purpleunuseddashboard": `{"message":"Back up deleted Grafana dashboard org-2/purpleunuseddashboard",` +
-				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQxLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
+				`"content":"eyJlZGl0YWJsZSI6ZmFsc2UsInNjaGVtYVZlcnNpb24iOjQyLCJ0aW1lIjp7ImZyb20iOiJub3ctNmgiLCJ0byI6I` +
 				`m5vdyJ9LCJ0aW1lcGlja2VyIjp7fSwidGltZXpvbmUiOiJicm93c2VyIiwidGl0bGUiOiJwdXJwbGV1bnVzZWRkYXNoYm9hcmQifQ=="` +
 				`,"branch":"main"}`,
 		}
@@ -109,7 +110,7 @@ func TestFriggIntegration(t *testing.T) {
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
 			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard",`+
-			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"ignoreduserdashboard\"}"}`,
 	)
 	assert.Contains(
@@ -117,7 +118,7 @@ func TestFriggIntegration(t *testing.T) {
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
 			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard",`+
-			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"unuseddashboard\"}"}`,
 	)
 	assert.Contains(
@@ -131,7 +132,7 @@ func TestFriggIntegration(t *testing.T) {
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"org-2",`+
 			`"uid":"JfROTruBNXvUjXF8aD455yc2sRiB397AL6Pscl8QChsX","name":"purpleunuseddashboard",`+
-			`"raw_json":"{\"editable\":false,\"schemaVersion\":41,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},`+
+			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},`+
 			`\"timepicker\":{},\"timezone\":\"browser\",\"title\":\"purpleunuseddashboard\"}"}`,
 	)
 	assert.Contains(
@@ -198,16 +199,19 @@ backup:
 	require.NoError(t, err)
 
 	grafana.CreateDashboard(t, apiKey, "default", "useddashboard")
+	grafana.CreateDashboard(t, apiKey, "default", "useddashboardapi")
 	grafana.CreateDashboard(t, apiKey, "default", "unuseddashboard")
 	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
 	grafana.CreateDashboard(t, purpleKey, purpleNamespace, "purpleunuseddashboard")
 
 	t.Setenv("GITHUB_API_URL", github.URL())
 
-	// Assert that the dashboard exists to create a read log entry in Loki.
-	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboard")
+	// Frigg counts two different activities as a dashboard "view": an API request to get the dashboard and a user
+	// opening the dashboard in Grafana's UI. Ensure that both types of activity are represented in the test.
+	grafana.ViewDashboardInUI(t, apiKey, "default", "useddashboard")
+	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboardapi")
 	// Create a log entry in Loki for the ignored user.
-	grafana.AssertDashboardExists(t, ignoredKey, "default", "ignoreduserdashboard")
+	grafana.ViewDashboardInUI(t, ignoredKey, "default", "ignoreduserdashboard")
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
