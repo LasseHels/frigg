@@ -10,6 +10,16 @@ period are considered unused.
 
 ![Frigg's architecture](/img/frigg-arch.svg)
 
+### The Details
+
+When gauging dashboard usage, Frigg counts two activities as a dashboard "view":
+- A user opens a dashboard in Grafana's web interface.
+- A client makes a request to Grafana's [GET /apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid](https://grafana.com/docs/grafana/v12.2/developer-resources/api-reference/http-api/dashboard/#get-dashboard)
+  API endpoint.
+
+Any dashboard that has been viewed at least once within the configured `prune.period` (see [Configuration](#configuration))
+is considered used and will not be deleted.
+
 ## Configuration
 
 Frigg is configured using a configuration file and a secrets file. The paths to these files are provided using the
