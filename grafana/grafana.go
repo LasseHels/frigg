@@ -176,7 +176,6 @@ type DashboardKey struct {
 //
 //nolint:lll
 func extractPathVariables(path string) (DashboardKey, error) {
-	// Strip the /dto suffix if present.
 	path = strings.TrimSuffix(path, "/dto")
 
 	pathParts := strings.Split(path, "/")
