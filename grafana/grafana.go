@@ -42,7 +42,7 @@ type NewClientOptions struct {
 	Logger     *slog.Logger
 	Client     client
 	HTTPClient httpClient
-	Endpoint   url.URL // Endpoint where Grafana can be reached, e.g. "https://grafana.example.com".
+	Endpoint   url.URL // Endpoint where Grafana can be reached, e.g., "https://grafana.example.com".
 	// Token used when authenticating with Grafana's HTTP API.
 	// Token is expected to have permissions to:
 	// - List dashboards in the Grafana instance. Frigg can only evaluate usage of dashboards that it can list.
@@ -222,7 +222,7 @@ func extractPathVariables(path string) (DashboardKey, error) {
 
 // UsedDashboards returns information about dashboard usage in range (now() - r) to now().
 //
-// A used dashboard is one that has been read by an unignored user (see UsedDashboardsOptions.IgnoredUsers) in the
+// A used dashboard is one that has been read by an un-ignored user (see UsedDashboardsOptions.IgnoredUsers) in the
 // given range.
 //
 // UsedDashboards errors if labels is empty.
@@ -358,6 +358,7 @@ type Dashboard struct {
 	Namespace         string          `json:"namespace"`
 	UID               string          `json:"uid"`
 	CreationTimestamp time.Time       `json:"creationTimestamp"`
+	Title             string          `json:"title"`
 	Spec              json.RawMessage `json:"spec"`
 }
 
@@ -389,6 +390,10 @@ type dashboardItemMetadata struct {
 	Namespace         string    `json:"namespace"`
 	UID               string    `json:"uid"`
 	CreationTimestamp time.Time `json:"creationTimestamp"`
+}
+
+type dashboardSpec struct {
+	Title string `json:"title"`
 }
 
 // AllDashboards returns all dashboards from the specified namespace in the Grafana instance.
@@ -469,11 +474,19 @@ func (c *Client) dashboardsPage(
 	dashboards := make([]Dashboard, 0, len(response.Items))
 	for i := range response.Items {
 		item := &response.Items[i]
+
+		var spec dashboardSpec
+		title := ""
+		if err := json.Unmarshal(item.Spec, &spec); err == nil {
+			title = spec.Title
+		}
+
 		dashboards = append(dashboards, Dashboard{
 			Name:              item.Metadata.Name,
 			Namespace:         item.Metadata.Namespace,
 			UID:               item.Metadata.UID,
 			CreationTimestamp: item.Metadata.CreationTimestamp,
+			Title:             title,
 			Spec:              item.Spec,
 		})
 	}
