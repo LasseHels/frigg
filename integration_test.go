@@ -109,7 +109,7 @@ func TestFriggIntegration(t *testing.T) {
 		t,
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
-			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard",`+
+			`"qXQslCwCEssfGqKRa9patJDjtRbOf5XNGwOXXjdRnx0X","name":"ignoreduserdashboard","title":"ignoreduserdashboard",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"ignoreduserdashboard\"}"}`,
 	)
@@ -117,7 +117,7 @@ func TestFriggIntegration(t *testing.T) {
 		t,
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"default","uid":`+
-			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard",`+
+			`"mspoU2EJfAXM0lQ8bBBUha0AszqQEKUKMjzu4Gc3rnEX","name":"unuseddashboard","title":"unuseddashboard",`+
 			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\`+
 			`"timepicker\":{},\"timezone\":\"browser\",\"title\":\"unuseddashboard\"}"}`,
 	)
@@ -132,8 +132,9 @@ func TestFriggIntegration(t *testing.T) {
 		logs,
 		`"msg":"Deleted unused dashboard","release":"integration-test","dry":false,"namespace":"org-2",`+
 			`"uid":"JfROTruBNXvUjXF8aD455yc2sRiB397AL6Pscl8QChsX","name":"purpleunuseddashboard",`+
-			`"raw_json":"{\"editable\":false,\"schemaVersion\":42,\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},`+
-			`\"timepicker\":{},\"timezone\":\"browser\",\"title\":\"purpleunuseddashboard\"}"}`,
+			`"title":"purpleunuseddashboard","raw_json":"{\"editable\":false,\"schemaVersion\":42,`+
+			`\"time\":{\"from\":\"now-6h\",\"to\":\"now\"},\"timepicker\":{},\"timezone\":\"browser\",`+
+			`\"title\":\"purpleunuseddashboard\"}"}`,
 	)
 	assert.Contains(
 		t,

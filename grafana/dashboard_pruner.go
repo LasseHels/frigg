@@ -127,7 +127,11 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	var deleted []string
 
 	for _, dashboard := range all {
-		dashboardLogger := d.logger.With(slog.String("uid", dashboard.UID), slog.String("name", dashboard.Name))
+		dashboardLogger := d.logger.With(
+			slog.String("uid", dashboard.UID),
+			slog.String("name", dashboard.Name),
+			slog.String("title", dashboard.Title),
+		)
 		usage, isUsed := usedDashboards[dashboard.Key()]
 		if isUsed {
 			dashboardLogger.Debug(
