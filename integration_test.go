@@ -61,6 +61,7 @@ func TestFriggIntegration(t *testing.T) {
 			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "useddashboardapi")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "ignoreduserdashboard")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
+			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "provisioneddashboard")
 		}, time.Second*10, time.Millisecond*100)
 
 		requests := env.github.Requests()

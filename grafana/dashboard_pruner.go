@@ -6,8 +6,6 @@ import (
 	"log/slog"
 	"strings"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type grafanaClient interface {
@@ -108,7 +106,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 
 	all, err := d.grafana.AllDashboards(ctx, d.namespace)
 	if err != nil {
-		return errors.Wrap(err, "fetching all Grafana dashboards")
+		return fmt.Errorf("fetching all Grafana dashboards: %w", err)
 	}
 
 	d.logger.Info("Found all Grafana dashboards", slog.Int("count", len(all)))
@@ -119,7 +117,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	}
 	used, err := d.grafana.UsedDashboards(ctx, d.labels, d.period, opts)
 	if err != nil {
-		return errors.Wrap(err, "fetching used Grafana dashboards")
+		return fmt.Errorf("fetching used Grafana dashboards: %w", err)
 	}
 
 	d.logger.Info("Found used Grafana dashboards", slog.Int("count", len(used)))
@@ -143,6 +141,11 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 			continue
 		}
 
+		if dashboard.Provisioned() {
+			dashboardLogger.Debug("Skipping provisioned dashboard", slog.String("managed_by", *dashboard.ManagedBy))
+			continue
+		}
+
 		if d.dry {
 			dashboardLogger.Info("Found unused dashboard, skipping deletion due to dry run")
 			continue
@@ -150,7 +153,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 
 		dashboardLogger.Info("Deleting unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
 		if err := d.grafana.DeleteDashboard(ctx, dashboard.Namespace, dashboard.Name, dashboard.Spec); err != nil {
-			return errors.Wrapf(err, "deleting unused dashboard %s", dashboard.UID)
+			return fmt.Errorf("deleting unused dashboard %s: %w", dashboard.UID, err)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
 		deleted = append(deleted, fmt.Sprintf("%s/%s", dashboard.Namespace, dashboard.Name))

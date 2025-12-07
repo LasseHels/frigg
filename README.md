@@ -20,6 +20,9 @@ When gauging dashboard usage, Frigg counts two activities as a dashboard "view":
 Any dashboard that has been viewed at least once within the configured `prune.period` (see [Configuration](#configuration))
 is considered used and will not be deleted.
 
+> [!IMPORTANT]
+> Frigg will never delete a [provisioned](https://grafana.com/docs/grafana/v12.2/administration/provisioning/#dashboards) dashboard.
+
 ## Configuration
 
 Frigg is configured using a configuration file and a secrets file. The paths to these files are provided using the

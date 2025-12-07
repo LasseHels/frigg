@@ -43,6 +43,13 @@ func NewGrafana(t *testing.T, logConsumers ...testcontainers.LogConsumer) *Grafa
 			// https://grafana.com/docs/grafana/v12.0/setup-grafana/configure-grafana/#router_logging.
 			"GF_SERVER_ROUTER_LOGGING": "true",
 		},
+		Files: []testcontainers.ContainerFile{
+			{
+				HostFilePath:      "testdata/provisioning/dashboards",
+				ContainerFilePath: "/etc/grafana/provisioning/dashboards",
+				FileMode:          0o755,
+			},
+		},
 		WaitingFor: wait.ForAll(
 			wait.ForExposedPort(),
 			wait.ForHTTP("/api/health"),
