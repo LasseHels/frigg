@@ -360,6 +360,7 @@ type Dashboard struct {
 	CreationTimestamp time.Time       `json:"creationTimestamp"`
 	Title             string          `json:"title"`
 	Spec              json.RawMessage `json:"spec"`
+	ManagedBy         *string         `json:"managedBy,omitempty"`
 }
 
 func (d *Dashboard) Key() DashboardKey {
@@ -367,6 +368,13 @@ func (d *Dashboard) Key() DashboardKey {
 		name:      d.Name,
 		namespace: d.Namespace,
 	}
+}
+
+// Provisioned returns true if the dashboard is [provisioned].
+//
+// [provisioned]: https://grafana.com/docs/grafana/v12.2/administration/provisioning
+func (d *Dashboard) Provisioned() bool {
+	return d.ManagedBy != nil
 }
 
 type dashboardListResponse struct {
@@ -386,10 +394,11 @@ type dashboardItem struct {
 }
 
 type dashboardItemMetadata struct {
-	Name              string    `json:"name"`
-	Namespace         string    `json:"namespace"`
-	UID               string    `json:"uid"`
-	CreationTimestamp time.Time `json:"creationTimestamp"`
+	Name              string            `json:"name"`
+	Namespace         string            `json:"namespace"`
+	UID               string            `json:"uid"`
+	CreationTimestamp time.Time         `json:"creationTimestamp"`
+	Annotations       map[string]string `json:"annotations"`
 }
 
 type dashboardSpec struct {
@@ -481,6 +490,11 @@ func (c *Client) dashboardsPage(
 			title = spec.Title
 		}
 
+		var managedBy *string
+		if value, ok := item.Metadata.Annotations["grafana.app/managedBy"]; ok {
+			managedBy = &value
+		}
+
 		dashboards = append(dashboards, Dashboard{
 			Name:              item.Metadata.Name,
 			Namespace:         item.Metadata.Namespace,
@@ -488,6 +502,7 @@ func (c *Client) dashboardsPage(
 			CreationTimestamp: item.Metadata.CreationTimestamp,
 			Title:             title,
 			Spec:              item.Spec,
+			ManagedBy:         managedBy,
 		})
 	}
 

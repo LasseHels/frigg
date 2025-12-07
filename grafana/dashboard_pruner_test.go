@@ -275,6 +275,77 @@ func TestDashboardPruner_Prune(t *testing.T) {
 		assert.Equal(t, expectedLogs, logs.String())
 	})
 
+	t.Run("skips provisioned dashboards", func(t *testing.T) {
+		t.Parallel()
+
+		deleteDashboardCalled := false
+		managedBy := "classic-file-provisioning"
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context, _ string) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:       "cbf15242-fec5-4272-be50-1f83322ecf2c",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Title:     "Dashboard 1",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
+						ManagedBy: nil,
+					},
+					{
+						UID:       "50c3ea9d-d578-4c0f-a9c4-128577783c03",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Title:     "Dashboard 2",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
+						ManagedBy: &managedBy,
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return nil, nil
+			},
+			deleteDashboard: func(_ context.Context, namespace, name string, _ []byte) error {
+				deleteDashboardCalled = true
+				assert.Equal(t, "default", namespace)
+				assert.Equal(t, "dashboard1", name)
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Namespace:    "default",
+			Interval:     time.Hour,
+			IgnoredUsers: []string{"admin"},
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.True(t, deleteDashboardCalled, "non-provisioned dashboard should be deleted")
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false,"namespace":"default"}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"namespace":"default","count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"namespace":"default","count":0}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"cbf15242-fec5-4272-be50-1f83322ecf2c","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"cbf15242-fec5-4272-be50-1f83322ecf2c","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"DEBUG","msg":"Skipping provisioned dashboard","dry":false,"namespace":"default","uid":"50c3ea9d-d578-4c0f-a9c4-128577783c03","name":"dashboard2","title":"Dashboard 2","managed_by":"classic-file-provisioning"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"namespace":"default","deleted_count":1,"deleted_dashboards":"default/dashboard1"}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
+
 	t.Run("does not delete unused dashboards in dry mode", func(t *testing.T) {
 		t.Parallel()
 

@@ -1,0 +1,12 @@
+{
+  "uid": "provisioneddashboard",
+  "editable": false,
+  "schemaVersion": 42,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "provisioneddashboard"
+}
