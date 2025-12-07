@@ -42,3 +42,4 @@ jobs:
         run: ko build . --bare --platform=${{ inputs.platforms }} --tags=${{ inputs.version }}
         env:
           KO_DOCKER_REPO: lassehels/frigg
+          GOFLAGS: -ldflags=-X=main.release=${{ inputs.version }}
