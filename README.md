@@ -21,7 +21,9 @@ Any dashboard that has been viewed at least once within the configured `prune.pe
 is considered used and will not be deleted.
 
 > [!IMPORTANT]
-> Frigg will never delete a [provisioned](https://grafana.com/docs/grafana/v12.2/administration/provisioning/#dashboards) dashboard.
+> Frigg will never delete dashboards that:
+>   1. Are [provisioned](https://grafana.com/docs/grafana/v12.2/administration/provisioning/#dashboards) _or_
+>   2. Have tags matching the configured skip list (see [Configuration](#configuration)).
 
 ## Configuration
 
@@ -114,6 +116,18 @@ prune:
   #
   # Must be greater than or equal to 0 (default: 10).
   lower_threshold: 10
+  # Configure Frigg to skip pruning dashboards that match certain conditions.
+  #
+  # Optional.
+  skip:
+    # Tag-based skip rules. Dashboards with matching tags will be skipped during pruning.
+    tags:
+      # Never delete dashboards that have ANY of these tags.
+      #
+      # Tag names are case and whitespace sensitive and must match exactly.
+      #
+      # If specified, 'any' must contain at least one item. Items may not be empty strings.
+      any: [keep, safeguard]
 
 backup:
   github:

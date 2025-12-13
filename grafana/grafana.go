@@ -359,6 +359,7 @@ type Dashboard struct {
 	UID               string          `json:"uid"`
 	CreationTimestamp time.Time       `json:"creationTimestamp"`
 	Title             string          `json:"title"`
+	Tags              []string        `json:"tags"`
 	Spec              json.RawMessage `json:"spec"`
 	ManagedBy         *string         `json:"managedBy,omitempty"`
 }
@@ -375,6 +376,15 @@ func (d *Dashboard) Key() DashboardKey {
 // [provisioned]: https://grafana.com/docs/grafana/v12.2/administration/provisioning
 func (d *Dashboard) Provisioned() bool {
 	return d.ManagedBy != nil
+}
+
+func (d *Dashboard) HasTag(tag string) bool {
+	for _, t := range d.Tags {
+		if t == tag {
+			return true
+		}
+	}
+	return false
 }
 
 type dashboardListResponse struct {
@@ -402,7 +412,8 @@ type dashboardItemMetadata struct {
 }
 
 type dashboardSpec struct {
-	Title string `json:"title"`
+	Title string   `json:"title"`
+	Tags  []string `json:"tags"`
 }
 
 // AllDashboards returns all dashboards from the specified namespace in the Grafana instance.
@@ -486,8 +497,10 @@ func (c *Client) dashboardsPage(
 
 		var spec dashboardSpec
 		title := ""
+		var tags []string
 		if err := json.Unmarshal(item.Spec, &spec); err == nil {
 			title = spec.Title
+			tags = spec.Tags
 		}
 
 		var managedBy *string
@@ -501,6 +514,7 @@ func (c *Client) dashboardsPage(
 			UID:               item.Metadata.UID,
 			CreationTimestamp: item.Metadata.CreationTimestamp,
 			Title:             title,
+			Tags:              tags,
 			Spec:              item.Spec,
 			ManagedBy:         managedBy,
 		})

@@ -29,6 +29,7 @@ type DashboardPruner struct {
 	labels         map[string]string
 	dry            bool
 	lowerThreshold int
+	skipTags       []string
 }
 
 type NewDashboardPrunerOptions struct {
@@ -54,6 +55,9 @@ type NewDashboardPrunerOptions struct {
 	Dry bool
 	// See UsedDashboardsOptions.LowerThreshold.
 	LowerThreshold int
+	// SkipTags is a list of dashboard tags that cause dashboards to be skipped during pruning. If a dashboard has any
+	// of these tags, it will be skipped. If this slice is empty or nil, no dashboards will be skipped based on tags.
+	SkipTags []string
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
@@ -72,6 +76,7 @@ func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 		labels:         opts.Labels,
 		dry:            opts.Dry,
 		lowerThreshold: opts.LowerThreshold,
+		skipTags:       opts.SkipTags,
 	}
 }
 
@@ -124,7 +129,8 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	usedDashboards := d.usedMap(used)
 	var deleted []string
 
-	for _, dashboard := range all {
+	for i := range all {
+		dashboard := &all[i]
 		dashboardLogger := d.logger.With(
 			slog.String("uid", dashboard.UID),
 			slog.String("name", dashboard.Name),
@@ -143,6 +149,16 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 
 		if dashboard.Provisioned() {
 			dashboardLogger.Debug("Skipping provisioned dashboard", slog.String("managed_by", *dashboard.ManagedBy))
+			continue
+		}
+
+		skip, matchedTag := d.hasSkipTag(dashboard)
+		if skip {
+			dashboardLogger.Info(
+				"Skipping dashboard with skip tag",
+				slog.String("tag", matchedTag),
+				slog.Any("dashboard_tags", dashboard.Tags),
+			)
 			continue
 		}
 
@@ -176,4 +192,19 @@ func (d *DashboardPruner) usedMap(used []DashboardReads) map[DashboardKey]Dashbo
 	}
 
 	return m
+}
+
+// hasSkipTag returns true if the dashboard has any tag in the skip list, along with the matched tag name.
+func (d *DashboardPruner) hasSkipTag(dashboard *Dashboard) (bool, string) {
+	if len(d.skipTags) == 0 {
+		return false, ""
+	}
+
+	for _, tag := range d.skipTags {
+		if dashboard.HasTag(tag) {
+			return true, tag
+		}
+	}
+
+	return false, ""
 }

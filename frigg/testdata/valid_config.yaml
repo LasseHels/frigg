@@ -21,6 +21,9 @@ prune:
     app: 'grafana'
     env: 'test'
   lower_threshold: 50
+  skip:
+    tags:
+      any: [keep, safeguard]
 
 backup:
   github:

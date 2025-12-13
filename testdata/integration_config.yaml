@@ -17,6 +17,9 @@ prune:
     app: 'grafana'
     env: 'integration-test'
   lower_threshold: 2
+  skip:
+    tags:
+      any: [keep]
 
 backup:
   github:

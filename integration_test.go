@@ -62,6 +62,7 @@ func TestFriggIntegration(t *testing.T) {
 			env.grafana.AssertDashboardDoesNotExist(collect, env.apiKey, "default", "ignoreduserdashboard")
 			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
 			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "provisioneddashboard")
+			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "skippeddashboard")
 		}, time.Second*10, time.Millisecond*100)
 
 		requests := env.github.Requests()
@@ -143,6 +144,13 @@ func TestFriggIntegration(t *testing.T) {
 		`"msg":"Finished pruning Grafana dashboards","release":"integration-test","dry":false,"namespace":"org-2",`+
 			`"deleted_count":1,"deleted_dashboards":"org-2/purpleunuseddashboard"}`,
 	)
+	assert.Contains(
+		t,
+		logs,
+		`"msg":"Skipping dashboard with skip tag","release":"integration-test","dry":false,"namespace":"default"`,
+	)
+	assert.Contains(t, logs, `"tag":"keep"`)
+	assert.Contains(t, logs, `"dashboard_tags":["keep"]`)
 
 	t.Run("shuts down gracefully", func(t *testing.T) {
 		cancel()
@@ -205,6 +213,7 @@ backup:
 	grafana.CreateDashboard(t, apiKey, "default", "unuseddashboard")
 	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
 	grafana.CreateDashboard(t, purpleKey, purpleNamespace, "purpleunuseddashboard")
+	grafana.CreateDashboardWithTags(t, apiKey, "default", "skippeddashboard", []string{"keep"})
 
 	t.Setenv("GITHUB_API_URL", github.URL())
 
