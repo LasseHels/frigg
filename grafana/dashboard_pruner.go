@@ -129,7 +129,8 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	usedDashboards := d.usedMap(used)
 	var deleted []string
 
-	for _, dashboard := range all {
+	for i := range all {
+		dashboard := &all[i]
 		dashboardLogger := d.logger.With(
 			slog.String("uid", dashboard.UID),
 			slog.String("name", dashboard.Name),
@@ -194,7 +195,7 @@ func (d *DashboardPruner) usedMap(used []DashboardReads) map[DashboardKey]Dashbo
 }
 
 // hasSkipTag returns true if the dashboard has any tag in the skip list, along with the matched tag name.
-func (d *DashboardPruner) hasSkipTag(dashboard Dashboard) (bool, string) {
+func (d *DashboardPruner) hasSkipTag(dashboard *Dashboard) (bool, string) {
 	if len(d.skipTags) == 0 {
 		return false, ""
 	}
