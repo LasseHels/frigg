@@ -12,13 +12,21 @@ grafana:
   endpoint: 'http://example.com'
 
 prune:
-  dry: true
-  interval: '24h'
-  period: '10m'
+  dry: false
+  interval: '5m'
+  period: '720h'
+  ignored_users: [admin]
+  lower_threshold: 50
   labels:
     app: 'grafana'
     env: 'test'
+  skip:
+    tags:
+      any: [keep, safeguard]
 
 backup:
   github:
     repository: 'octocat/hello-world'
+    branch: 'backup-branch'
+    directory: 'archived-dashboards'
+    api_url: 'https://github.example.com/api/v3'

@@ -1,0 +1,19 @@
+server:
+  host: localhost
+  port: 8080
+
+loki:
+  endpoint: 'http://loki.example.com'
+
+grafana:
+  endpoint: 'http://example.com'
+
+prune:
+  period: '720h'
+  labels:
+    app: 'grafana'
+  skip: {}
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

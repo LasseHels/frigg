@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -199,6 +200,50 @@ func (g *Grafana) CreateDashboard(t *testing.T, apiKey, namespace, name string) 
   }
 }
 `, name, name))
+
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewBuffer(payload))
+	require.NoError(t, err)
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+
+	_ = do(t, req, http.StatusCreated)
+}
+
+// CreateDashboardWithTags creates a dashboard in Grafana with the specified tags.
+func (g *Grafana) CreateDashboardWithTags(t *testing.T, apiKey, namespace, name string, tags []string) {
+	t.Helper()
+
+	tagsJSON := "[]"
+	if len(tags) > 0 {
+		var tagStrings []string
+		for _, tag := range tags {
+			tagStrings = append(tagStrings, fmt.Sprintf("%q", tag))
+		}
+		tagsJSON = fmt.Sprintf("[%s]", strings.Join(tagStrings, ","))
+	}
+
+	url := fmt.Sprintf("http://%s/apis/dashboard.grafana.app/v1beta1/namespaces/%s/dashboards", g.host, namespace)
+	payload := []byte(fmt.Sprintf(`
+{
+  "metadata": {
+    "name": %q
+  },
+  "spec": {
+    "editable": false,
+    "schemaVersion": 41,
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    },
+    "timepicker": {},
+    "timezone": "browser",
+    "title": %q,
+    "tags": %s,
+    "version": 0
+  }
+}
+`, name, name, tagsJSON))
 
 	req, err := http.NewRequestWithContext(t.Context(), http.MethodPost, url, bytes.NewBuffer(payload))
 	require.NoError(t, err)

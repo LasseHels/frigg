@@ -184,6 +184,11 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			return nil, errors.Wrapf(err, "creating Grafana client for namespace %s", namespace)
 		}
 
+		var skipTags []string
+		if c.Prune.Skip != nil && c.Prune.Skip.Tags != nil {
+			skipTags = c.Prune.Skip.Tags.Any
+		}
+
 		pruner := grafana.NewDashboardPruner(&grafana.NewDashboardPrunerOptions{
 			Grafana:        grafanaClient,
 			Logger:         logger,
@@ -194,6 +199,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			Labels:         c.Prune.Labels,
 			Dry:            c.Prune.Dry,
 			LowerThreshold: c.Prune.LowerThreshold,
+			SkipTags:       skipTags,
 		})
 		pruners = append(pruners, pruner)
 	}

@@ -60,6 +60,11 @@ func TestNewConfig(t *testing.T) {
 						"env": "test",
 					},
 					LowerThreshold: 50,
+					Skip: &grafana.SkipConfig{
+						Tags: &grafana.SkipTagsConfig{
+							Any: []string{"keep", "safeguard"},
+						},
+					},
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -280,6 +285,24 @@ func TestNewConfig(t *testing.T) {
 			expectedConfig: nil,
 			expectedError: "validating configuration: Key: 'Config.Backup.GitHub.APIURL' Error:" +
 				"Field validation for 'APIURL' failed on the 'url' tag",
+		},
+		"empty skip config": {
+			configPath:     "testdata/empty_skip_config.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.Skip.Tags' Error:" +
+				"Field validation for 'Tags' failed on the 'required' tag",
+		},
+		"empty skip tags config": {
+			configPath:     "testdata/empty_skip_tags_config.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.Skip.Tags.Any' Error:" +
+				"Field validation for 'Any' failed on the 'required' tag",
+		},
+		"empty skip tags any config": {
+			configPath:     "testdata/empty_skip_tags_any_config.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.Skip.Tags.Any' Error:" +
+				"Field validation for 'Any' failed on the 'min' tag",
 		},
 	}
 
