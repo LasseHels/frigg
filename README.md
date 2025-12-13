@@ -222,3 +222,8 @@ If `FRIGG_HOST` is set to `example.com`, Frigg will use `example.com` as the ser
 
 > [!NOTE]
 > The secrets file does not support environment variable expansion for security reasons.
+
+## Linting & Testing
+
+Use `make lint` and `make test-all` to verify the correctness of changes made. Frigg uses
+[golangci-lint](https://golangci-lint.run/docs/) for linting.
