@@ -63,6 +63,8 @@ func TestFriggIntegration(t *testing.T) {
 			env.grafana.AssertDashboardDoesNotExist(collect, env.purpleKey, env.purpleNamespace, "purpleunuseddashboard")
 			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "provisioneddashboard")
 			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "skippeddashboard")
+			// Dashboard viewed with empty uname should still be considered used.
+			env.grafana.AssertDashboardExists(collect, env.apiKey, "default", "anonymousviewdashboard")
 		}, time.Second*10, time.Millisecond*100)
 
 		requests := env.github.Requests()
@@ -214,6 +216,7 @@ backup:
 	grafana.CreateDashboard(t, apiKey, "default", "ignoreduserdashboard")
 	grafana.CreateDashboard(t, purpleKey, purpleNamespace, "purpleunuseddashboard")
 	grafana.CreateDashboardWithTags(t, apiKey, "default", "skippeddashboard", []string{"keep"})
+	grafana.CreateDashboard(t, apiKey, "default", "anonymousviewdashboard")
 
 	t.Setenv("GITHUB_API_URL", github.URL())
 
@@ -223,6 +226,23 @@ backup:
 	grafana.AssertDashboardExists(t, apiKey, "default", "useddashboardapi")
 	// Create a log entry in Loki for the ignored user.
 	grafana.ViewDashboardInUI(t, ignoredKey, "default", "ignoreduserdashboard")
+
+	// Push a synthetic log line with an empty uname field to simulate an anonymous/failed auth view.
+	// This tests that Frigg handles missing uname gracefully and still counts it as a dashboard view.
+	anonymousViewLog := integrationtest.LogEntry{
+		Timestamp: now.Add(-5 * time.Minute),
+		Message: `logger=context userId=0 orgId=0 uname= t=2026-01-08T12:00:00.000000000Z level=info ` +
+			`msg="Request Completed" method=GET ` +
+			`path=/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/anonymousviewdashboard/dto ` +
+			`status=401 remote_addr=127.0.0.1 time_ms=1 duration=1ms size=40 referer="" ` +
+			`db_call_count=0 handler=/apis/* status_source=server error="user token not found"`,
+		Labels: map[string]string{
+			"app": "grafana",
+			"env": "integration-test",
+		},
+	}
+	err = loki.PushLogs(t.Context(), []integrationtest.LogEntry{anonymousViewLog})
+	require.NoError(t, err)
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))

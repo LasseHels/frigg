@@ -312,13 +312,13 @@ func (c *Client) UsedDashboards(
 			return nil, errors.Wrapf(err, "extracting variables from path %q", path)
 		}
 
-		user, ok := stream["uname"]
-		if !ok {
-			return nil, fmt.Errorf("could not find uname in stream labels: %v", stream)
-		}
+		user := stream["uname"]
 
-		if _, ignored := ignoredUsers[user]; ignored {
-			continue
+		// Only check ignored users if we have a username. Empty username is never ignored.
+		if user != "" {
+			if _, ignored := ignoredUsers[user]; ignored {
+				continue
+			}
 		}
 
 		readCounts[key]++
@@ -326,7 +326,11 @@ func (c *Client) UsedDashboards(
 		if _, exists := readsByUID[key]; !exists {
 			readsByUID[key] = make(map[string]struct{})
 		}
-		readsByUID[key][user] = struct{}{}
+
+		// Only track unique users if we have a username.
+		if user != "" {
+			readsByUID[key][user] = struct{}{}
+		}
 	}
 
 	result := make([]DashboardReads, 0, len(readsByUID))

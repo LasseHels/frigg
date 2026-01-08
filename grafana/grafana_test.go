@@ -132,22 +132,6 @@ func TestClient_UsedDashboards(t *testing.T) {
 				`unexpected path format: "/invalid/path", expected format ` +
 				`"/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"`,
 		},
-		"missing uname in stream labels": {
-			mockLogs: []loki.Log{
-				loki.NewLog(
-					time.Now(),
-					"log message",
-					map[string]string{
-						"path": "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
-					},
-				),
-			},
-			mockErr:        nil,
-			lowerThreshold: 1,
-			labels:         map[string]string{"app": "grafana"},
-			expectedErrText: "could not find uname in stream labels: " +
-				"map[path:/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1]",
-		},
 	}
 
 	for name, tc := range tests {
@@ -431,6 +415,159 @@ func TestClient_UsedDashboards(t *testing.T) {
 		assert.Equal(t, "default", results[1].Namespace())
 		assert.Equal(t, 5, results[1].Reads())
 		assert.Equal(t, 1, results[1].Users())
+	})
+
+	t.Run("empty uname counts as read but not as unique user", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "user1",
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "", // Empty uname.
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 3",
+				map[string]string{
+					"path": "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					// Missing uname entirely.
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "cherry",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+		}
+
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// All three logs count as reads, but only one has a valid username.
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, 3, results[0].Reads())
+		assert.Equal(t, 1, results[0].Users())
+	})
+
+	t.Run("dashboard with only empty uname views is still considered used", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "", // Empty uname.
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path": "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					// Missing uname.
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "mango",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+		}
+
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// Dashboard is considered used even with zero identified users.
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, 2, results[0].Reads())
+		assert.Equal(t, 0, results[0].Users())
+	})
+
+	t.Run("empty uname is never filtered by ignored users", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "ignoredUser",
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "", // Empty uname should never be ignored.
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "papaya",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+			IgnoredUsers:   []string{"ignoredUser"},
+		}
+
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+
+		// The ignored user's read is filtered out, but the empty uname read counts.
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, 1, results[0].Reads())
+		assert.Equal(t, 0, results[0].Users())
 	})
 }
 
