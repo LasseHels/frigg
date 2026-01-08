@@ -28,13 +28,6 @@ const flagConfigFile = "config.file"
 const flagSecretsFile = "secrets.file"
 
 func main() {
-	os.Exit(start())
-}
-
-func start() int {
-	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
-	defer stop()
-
 	var configPath, secretsPath string
 	flag.StringVar(
 		&configPath,
@@ -49,6 +42,13 @@ func start() int {
 		"Path to Frigg's secrets file. The file's extension must be .json, .yml or .yaml (required)",
 	)
 	flag.Parse()
+
+	os.Exit(start(configPath, secretsPath))
+}
+
+func start(configPath, secretsPath string) int {
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
 
 	if err := run(ctx, configPath, secretsPath, os.Stdout); err != nil {
 		fmt.Println(err.Error())
