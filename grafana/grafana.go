@@ -312,6 +312,18 @@ func (c *Client) UsedDashboards(
 			return nil, errors.Wrapf(err, "extracting variables from path %q", path)
 		}
 
+		// A log line is not guaranteed to have a username. If a user attempts to open a dashboard with an expired
+		// token, then Grafana will emit a log line like:
+		//
+		// app:grafana db_call_count:1 duration:1.16875ms env:prod error:token needs to be rotated
+		// errorMessageID:session.token.rotate errorReason:Unauthorized handler:/apis/* level:info logger:context
+		// method:GET msg:Request Completed namespace:grafana orgId:0
+		// path:/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/xyz/dto provider:azure
+		// region:westeurope size:105 status:401 status_source:server t:2025-11-13T17:15:43.913054944Z time_ms:1
+		// userId:0
+		//
+		// To err on the side of not erroneously deleting used dashboards, we consider such a log line as intent to view
+		// and count it as a view, even though we cannot attribute it to a specific user.
 		user := stream["uname"]
 
 		// Only check ignored users if we have a username. Empty username is never ignored.
