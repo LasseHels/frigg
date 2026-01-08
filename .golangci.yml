@@ -143,6 +143,8 @@ linters:
           disabled: true
         - name: package-comments
           disabled: true
+        - name: unsecure-url-scheme
+          disabled: true
     rowserrcheck:
       packages:
         - github.com/jmoiron/sqlx

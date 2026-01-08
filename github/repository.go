@@ -14,7 +14,7 @@ type Config struct {
 	Repository Repository `yaml:"repository" validate:"required"`
 	Branch     string     `yaml:"branch" validate:"required"`
 	Directory  string     `yaml:"directory" validate:"required"`
-	APIURL     string     `yaml:"api_url" validate:"omitempty,url"` //nolint:revive // omitempty is valid for validator
+	APIURL     string     `yaml:"api_url" validate:"omitempty,url"`
 }
 
 // Repository represents a GitHub repository in "owner/repo" format.
