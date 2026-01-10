@@ -250,11 +250,30 @@ func (c *Client) UsedDashboards(
 		opts.LowerThreshold = 10
 	}
 
+	query := buildLogQuery(labels)
+
+	end := time.Now().UTC()
+	start := end.Add(-r)
+
+	logs, err := c.queryLogs(ctx, query, start, end, opts.ChunkSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(logs) < opts.LowerThreshold {
+		return nil, fmt.Errorf("found fewer logs (%d) than the lower threshold (%d)", len(logs), opts.LowerThreshold)
+	}
+
 	ignoredUsers := make(map[string]struct{})
 	for _, user := range opts.IgnoredUsers {
 		ignoredUsers[user] = struct{}{}
 	}
 
+	return processLogs(logs, ignoredUsers)
+}
+
+// buildLogQuery constructs a LogQL query for finding dashboard read logs.
+func buildLogQuery(labels map[string]string) string {
 	var labelParts []string
 	for k, v := range labels {
 		labelParts = append(labelParts, fmt.Sprintf(`%s=%q`, k, v))
@@ -264,7 +283,7 @@ func (c *Client) UsedDashboards(
 		labelStr = "{" + labelStr + "}"
 	}
 
-	query := fmt.Sprintf(`%s
+	return fmt.Sprintf(`%s
 |= "/apis/dashboard.grafana.app/"
 |= "/namespaces/"
 |= "/dashboards/"
@@ -272,14 +291,20 @@ func (c *Client) UsedDashboards(
 | logfmt
 | method = "GET"
 | handler = "/apis/*"`, labelStr)
+}
 
-	end := time.Now().UTC()
-	start := end.Add(-r)
-
+// queryLogs executes Loki queries in time-based chunks to avoid large single queries.
+func (c *Client) queryLogs(
+	ctx context.Context,
+	query string,
+	start,
+	end time.Time,
+	chunkSize time.Duration,
+) ([]loki.Log, error) {
 	var logs []loki.Log
 
-	for chunkStart := start; chunkStart.Before(end); chunkStart = chunkStart.Add(opts.ChunkSize) {
-		chunkEnd := chunkStart.Add(opts.ChunkSize)
+	for chunkStart := start; chunkStart.Before(end); chunkStart = chunkStart.Add(chunkSize) {
+		chunkEnd := chunkStart.Add(chunkSize)
 		if chunkEnd.After(end) {
 			chunkEnd = end
 		}
@@ -292,11 +317,13 @@ func (c *Client) UsedDashboards(
 		logs = append(logs, chunkLogs...)
 	}
 
-	if len(logs) < opts.LowerThreshold {
-		return nil, fmt.Errorf("found fewer logs (%d) than the lower threshold (%d)", len(logs), opts.LowerThreshold)
-	}
+	return logs, nil
+}
 
-	readsByUID := make(map[DashboardKey]map[string]struct{})
+// processLogs extracts dashboard read information from Grafana logs.
+// It returns a slice of DashboardReads sorted by dashboard name.
+func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]DashboardReads, error) {
+	readsByKey := make(map[DashboardKey]map[string]struct{})
 	readCounts := make(map[DashboardKey]int)
 
 	for _, log := range logs {
@@ -313,7 +340,9 @@ func (c *Client) UsedDashboards(
 		}
 
 		// A log line is not guaranteed to have a username. If a user attempts to open a dashboard with an expired
-		// token, then Grafana will emit a log line like:
+		// token, then Grafana will emit a log line without a username. To err on the side of not erroneously deleting
+		// used dashboards, we consider such a log line as intent to view and count it as a view, even though we cannot
+		// attribute it to a specific user. An example of a log line without a username is:
 		//
 		// app:grafana db_call_count:1 duration:1.16875ms env:prod error:token needs to be rotated
 		// errorMessageID:session.token.rotate errorReason:Unauthorized handler:/apis/* level:info logger:context
@@ -321,9 +350,6 @@ func (c *Client) UsedDashboards(
 		// path:/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/xyz/dto provider:azure
 		// region:westeurope size:105 status:401 status_source:server t:2025-11-13T17:15:43.913054944Z time_ms:1
 		// userId:0
-		//
-		// To err on the side of not erroneously deleting used dashboards, we consider such a log line as intent to view
-		// and count it as a view, even though we cannot attribute it to a specific user.
 		user := stream["uname"]
 
 		// Only check ignored users if we have a username. Empty username is never ignored.
@@ -335,29 +361,29 @@ func (c *Client) UsedDashboards(
 
 		readCounts[key]++
 
-		if _, exists := readsByUID[key]; !exists {
-			readsByUID[key] = make(map[string]struct{})
+		if _, exists := readsByKey[key]; !exists {
+			readsByKey[key] = make(map[string]struct{})
 		}
 
 		// Only track unique users if we have a username.
 		if user != "" {
-			readsByUID[key][user] = struct{}{}
+			readsByKey[key][user] = struct{}{}
 		}
 	}
 
-	result := make([]DashboardReads, 0, len(readsByUID))
-	for vars, users := range readsByUID {
+	result := make([]DashboardReads, 0, len(readsByKey))
+	for key, users := range readsByKey {
 		result = append(result, DashboardReads{
-			name:      vars.name,
-			namespace: vars.namespace,
-			reads:     readCounts[vars],
+			name:      key.name,
+			namespace: key.namespace,
+			reads:     readCounts[key],
 			users:     len(users),
 		})
 	}
 
 	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard name for consistency.
 	sort.Slice(result, func(i, j int) bool {
-		// Dashboard name are unique only within their namespace. If two dashboards have the same name,
+		// Dashboard names are unique only within their namespace. If two dashboards have the same name,
 		// we sort by namespace.
 		if result[i].name == result[j].name {
 			return result[i].namespace < result[j].namespace
