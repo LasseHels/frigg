@@ -24,6 +24,7 @@ prune:
   skip:
     tags:
       any: [keep, safeguard]
+  max_deletions: 25
 
 backup:
   github:
