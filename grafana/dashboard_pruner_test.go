@@ -537,6 +537,217 @@ func TestDashboardPruner_Prune(t *testing.T) {
 `
 		assert.Equal(t, expectedLogs, logs.String())
 	})
+
+	t.Run("max deletions limits number of deleted dashboards", func(t *testing.T) {
+		t.Parallel()
+
+		var deletedNames []string
+		maxDeletions := 1
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context, _ string) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:       "uid1",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Title:     "Dashboard 1",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
+					},
+					{
+						UID:       "uid2",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Title:     "Dashboard 2",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
+					},
+					{
+						UID:       "uid3",
+						Name:      "dashboard3",
+						Namespace: "default",
+						Title:     "Dashboard 3",
+						Spec:      json.RawMessage(`{"title": "Dashboard 3"}`),
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return nil, nil
+			},
+			deleteDashboard: func(_ context.Context, namespace, name string, _ []byte) error {
+				deletedNames = append(deletedNames, name)
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Namespace:    "default",
+			Interval:     time.Hour,
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+			MaxDeletions: &maxDeletions,
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.Len(t, deletedNames, 1)
+		assert.Equal(t, "dashboard1", deletedNames[0])
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false,"namespace":"default"}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"namespace":"default","count":3}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"namespace":"default","count":0}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Reached maximum deletion limit","dry":false,"namespace":"default","max_deletions":1,"remaining_unused_dashboards":2}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"namespace":"default","deleted_count":1,"deleted_dashboards":"default/dashboard1"}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
+
+	t.Run("max deletions higher than unused count deletes all", func(t *testing.T) {
+		t.Parallel()
+
+		var deletedNames []string
+		maxDeletions := 10
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context, _ string) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:       "uid1",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Title:     "Dashboard 1",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
+					},
+					{
+						UID:       "uid2",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Title:     "Dashboard 2",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return nil, nil
+			},
+			deleteDashboard: func(_ context.Context, namespace, name string, _ []byte) error {
+				deletedNames = append(deletedNames, name)
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Namespace:    "default",
+			Interval:     time.Hour,
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+			MaxDeletions: &maxDeletions,
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"dashboard1", "dashboard2"}, deletedNames)
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false,"namespace":"default"}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"namespace":"default","count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"namespace":"default","count":0}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"uid2","name":"dashboard2","title":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"uid2","name":"dashboard2","title":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"namespace":"default","deleted_count":2,"deleted_dashboards":"default/dashboard1, default/dashboard2"}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
+
+	t.Run("max deletions equal to unused count deletes all", func(t *testing.T) {
+		t.Parallel()
+
+		var deletedNames []string
+		maxDeletions := 2
+
+		mockClient := &mockGrafanaClient{
+			allDashboards: func(_ context.Context, _ string) ([]Dashboard, error) {
+				return []Dashboard{
+					{
+						UID:       "uid1",
+						Name:      "dashboard1",
+						Namespace: "default",
+						Title:     "Dashboard 1",
+						Spec:      json.RawMessage(`{"title": "Dashboard 1"}`),
+					},
+					{
+						UID:       "uid2",
+						Name:      "dashboard2",
+						Namespace: "default",
+						Title:     "Dashboard 2",
+						Spec:      json.RawMessage(`{"title": "Dashboard 2"}`),
+					},
+				}, nil
+			},
+			usedDashboards: func(
+				_ context.Context,
+				_ map[string]string,
+				_ time.Duration,
+				_ UsedDashboardsOptions,
+			) ([]DashboardReads, error) {
+				return nil, nil
+			},
+			deleteDashboard: func(_ context.Context, namespace, name string, _ []byte) error {
+				deletedNames = append(deletedNames, name)
+				return nil
+			},
+		}
+
+		l, logs := logger()
+
+		pruner := NewDashboardPruner(&NewDashboardPrunerOptions{
+			Grafana:      mockClient,
+			Logger:       l,
+			Namespace:    "default",
+			Interval:     time.Hour,
+			Period:       24 * time.Hour,
+			Labels:       map[string]string{"app": "grafana"},
+			MaxDeletions: &maxDeletions,
+		})
+
+		err := pruner.prune(t.Context())
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"dashboard1", "dashboard2"}, deletedNames)
+
+		//nolint:lll
+		expectedLogs := `{"level":"INFO","msg":"Pruning Grafana dashboards","dry":false,"namespace":"default"}
+{"level":"INFO","msg":"Found all Grafana dashboards","dry":false,"namespace":"default","count":2}
+{"level":"INFO","msg":"Found used Grafana dashboards","dry":false,"namespace":"default","count":0}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"uid1","name":"dashboard1","title":"Dashboard 1","raw_json":"{\"title\": \"Dashboard 1\"}"}
+{"level":"INFO","msg":"Deleting unused dashboard","dry":false,"namespace":"default","uid":"uid2","name":"dashboard2","title":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Deleted unused dashboard","dry":false,"namespace":"default","uid":"uid2","name":"dashboard2","title":"Dashboard 2","raw_json":"{\"title\": \"Dashboard 2\"}"}
+{"level":"INFO","msg":"Finished pruning Grafana dashboards","dry":false,"namespace":"default","deleted_count":2,"deleted_dashboards":"default/dashboard1, default/dashboard2"}
+`
+		assert.Equal(t, expectedLogs, logs.String())
+	})
 }
 
 func newMockDashboardReads(name string, reads, users int) DashboardReads {

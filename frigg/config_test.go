@@ -65,6 +65,7 @@ func TestNewConfig(t *testing.T) {
 							Any: []string{"keep", "safeguard"},
 						},
 					},
+					MaxDeletions: intPtr(25),
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -304,6 +305,18 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Prune.Skip.Tags.Any' Error:" +
 				"Field validation for 'Any' failed on the 'min' tag",
 		},
+		"zero max deletions": {
+			configPath:     "testdata/zero_max_deletions.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.MaxDeletions' Error:" +
+				"Field validation for 'MaxDeletions' failed on the 'min' tag",
+		},
+		"negative max deletions": {
+			configPath:     "testdata/negative_max_deletions.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.MaxDeletions' Error:" +
+				"Field validation for 'MaxDeletions' failed on the 'min' tag",
+		},
 	}
 
 	for name, tt := range tests {
@@ -510,4 +523,8 @@ func exampleRepository(t testing.TB) github.Repository {
 	r, err := github.NewRepository("octocat", "hello-world")
 	require.NoError(t, err)
 	return *r
+}
+
+func intPtr(i int) *int {
+	return &i
 }

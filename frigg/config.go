@@ -200,6 +200,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			Dry:            c.Prune.Dry,
 			LowerThreshold: c.Prune.LowerThreshold,
 			SkipTags:       skipTags,
+			MaxDeletions:   c.Prune.MaxDeletions,
 		})
 		pruners = append(pruners, pruner)
 	}
