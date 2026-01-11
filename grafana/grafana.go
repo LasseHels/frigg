@@ -323,7 +323,7 @@ func (c *Client) queryLogs(
 // processLogs extracts dashboard read information from Grafana logs.
 // It returns a slice of DashboardReads sorted by dashboard name.
 func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]DashboardReads, error) {
-	readsByKey := make(map[DashboardKey]map[string]struct{})
+	readsByUID := make(map[DashboardKey]map[string]struct{})
 	readCounts := make(map[DashboardKey]int)
 
 	for _, log := range logs {
@@ -340,9 +340,7 @@ func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]Dashboard
 		}
 
 		// A log line is not guaranteed to have a username. If a user attempts to open a dashboard with an expired
-		// token, then Grafana will emit a log line without a username. To err on the side of not erroneously deleting
-		// used dashboards, we consider such a log line as intent to view and count it as a view, even though we cannot
-		// attribute it to a specific user. An example of a log line without a username is:
+		// token, then Grafana will emit a log line like:
 		//
 		// app:grafana db_call_count:1 duration:1.16875ms env:prod error:token needs to be rotated
 		// errorMessageID:session.token.rotate errorReason:Unauthorized handler:/apis/* level:info logger:context
@@ -350,6 +348,9 @@ func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]Dashboard
 		// path:/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/xyz/dto provider:azure
 		// region:westeurope size:105 status:401 status_source:server t:2025-11-13T17:15:43.913054944Z time_ms:1
 		// userId:0
+		//
+		// To err on the side of not erroneously deleting used dashboards, we consider such a log line as intent to view
+		// and count it as a view, even though we cannot attribute it to a specific user.
 		user := stream["uname"]
 
 		// Only check ignored users if we have a username. Empty username is never ignored.
@@ -361,22 +362,22 @@ func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]Dashboard
 
 		readCounts[key]++
 
-		if _, exists := readsByKey[key]; !exists {
-			readsByKey[key] = make(map[string]struct{})
+		if _, exists := readsByUID[key]; !exists {
+			readsByUID[key] = make(map[string]struct{})
 		}
 
 		// Only track unique users if we have a username.
 		if user != "" {
-			readsByKey[key][user] = struct{}{}
+			readsByUID[key][user] = struct{}{}
 		}
 	}
 
-	result := make([]DashboardReads, 0, len(readsByKey))
-	for key, users := range readsByKey {
+	result := make([]DashboardReads, 0, len(readsByUID))
+	for vars, users := range readsByUID {
 		result = append(result, DashboardReads{
-			name:      key.name,
-			namespace: key.namespace,
-			reads:     readCounts[key],
+			name:      vars.name,
+			namespace: vars.namespace,
+			reads:     readCounts[vars],
 			users:     len(users),
 		})
 	}
