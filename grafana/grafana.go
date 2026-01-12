@@ -250,11 +250,30 @@ func (c *Client) UsedDashboards(
 		opts.LowerThreshold = 10
 	}
 
+	query := buildLogQuery(labels)
+
+	end := time.Now().UTC()
+	start := end.Add(-r)
+
+	logs, err := c.queryLogs(ctx, query, start, end, opts.ChunkSize)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(logs) < opts.LowerThreshold {
+		return nil, fmt.Errorf("found fewer logs (%d) than the lower threshold (%d)", len(logs), opts.LowerThreshold)
+	}
+
 	ignoredUsers := make(map[string]struct{})
 	for _, user := range opts.IgnoredUsers {
 		ignoredUsers[user] = struct{}{}
 	}
 
+	return processLogs(logs, ignoredUsers)
+}
+
+// buildLogQuery constructs a LogQL query for finding dashboard read logs.
+func buildLogQuery(labels map[string]string) string {
 	var labelParts []string
 	for k, v := range labels {
 		labelParts = append(labelParts, fmt.Sprintf(`%s=%q`, k, v))
@@ -264,7 +283,7 @@ func (c *Client) UsedDashboards(
 		labelStr = "{" + labelStr + "}"
 	}
 
-	query := fmt.Sprintf(`%s
+	return fmt.Sprintf(`%s
 |= "/apis/dashboard.grafana.app/"
 |= "/namespaces/"
 |= "/dashboards/"
@@ -272,14 +291,20 @@ func (c *Client) UsedDashboards(
 | logfmt
 | method = "GET"
 | handler = "/apis/*"`, labelStr)
+}
 
-	end := time.Now().UTC()
-	start := end.Add(-r)
-
+// queryLogs executes Loki queries in time-based chunks to avoid large single queries.
+func (c *Client) queryLogs(
+	ctx context.Context,
+	query string,
+	start,
+	end time.Time,
+	chunkSize time.Duration,
+) ([]loki.Log, error) {
 	var logs []loki.Log
 
-	for chunkStart := start; chunkStart.Before(end); chunkStart = chunkStart.Add(opts.ChunkSize) {
-		chunkEnd := chunkStart.Add(opts.ChunkSize)
+	for chunkStart := start; chunkStart.Before(end); chunkStart = chunkStart.Add(chunkSize) {
+		chunkEnd := chunkStart.Add(chunkSize)
 		if chunkEnd.After(end) {
 			chunkEnd = end
 		}
@@ -292,10 +317,12 @@ func (c *Client) UsedDashboards(
 		logs = append(logs, chunkLogs...)
 	}
 
-	if len(logs) < opts.LowerThreshold {
-		return nil, fmt.Errorf("found fewer logs (%d) than the lower threshold (%d)", len(logs), opts.LowerThreshold)
-	}
+	return logs, nil
+}
 
+// processLogs extracts dashboard read information from Grafana logs.
+// It returns a slice of DashboardReads sorted by dashboard name.
+func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]DashboardReads, error) {
 	readsByUID := make(map[DashboardKey]map[string]struct{})
 	readCounts := make(map[DashboardKey]int)
 
@@ -357,7 +384,7 @@ func (c *Client) UsedDashboards(
 
 	// The result slice is created from a map with no guaranteed order, so we sort it by dashboard name for consistency.
 	sort.Slice(result, func(i, j int) bool {
-		// Dashboard name are unique only within their namespace. If two dashboards have the same name,
+		// Dashboard names are unique only within their namespace. If two dashboards have the same name,
 		// we sort by namespace.
 		if result[i].name == result[j].name {
 			return result[i].namespace < result[j].namespace
