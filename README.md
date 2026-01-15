@@ -128,6 +128,15 @@ prune:
       #
       # If specified, 'any' must contain at least one item. Items may not be empty strings.
       any: [keep, safeguard]
+  # Maximum number of dashboards to delete per pruning run. Use this to gradually roll out Frigg in large Grafana
+  # instances. When the limit is reached, Frigg logs a message indicating how many unused dashboards remain and stops
+  # deleting for that run.
+  #
+  # Must be at least 1 if set. Omit this option for unlimited deletions. Use 'dry: true' if you want Frigg to delete
+  # no dashboards at all. This option has no effect on dry runs.
+  #
+  # Optional.
+  max_deletions: 10
 
 backup:
   github:

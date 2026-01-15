@@ -14,6 +14,7 @@ type PruneConfig struct {
 	Labels         map[string]string `yaml:"labels" validate:"required"`
 	LowerThreshold int               `yaml:"lower_threshold" validate:"min=0"`
 	Skip           *SkipConfig       `yaml:"skip"`
+	MaxDeletions   *int              `yaml:"max_deletions" validate:"omitempty,min=1"`
 }
 
 type SkipConfig struct {

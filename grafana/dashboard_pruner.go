@@ -30,6 +30,7 @@ type DashboardPruner struct {
 	dry            bool
 	lowerThreshold int
 	skipTags       []string
+	maxDeletions   *int
 }
 
 type NewDashboardPrunerOptions struct {
@@ -58,6 +59,8 @@ type NewDashboardPrunerOptions struct {
 	// SkipTags is a list of dashboard tags that cause dashboards to be skipped during pruning. If a dashboard has any
 	// of these tags, it will be skipped. If this slice is empty or nil, no dashboards will be skipped based on tags.
 	SkipTags []string
+	// MaxDeletions is the maximum number of dashboards to delete per pruning run. If nil, there is no limit.
+	MaxDeletions *int
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
@@ -77,6 +80,7 @@ func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 		dry:            opts.Dry,
 		lowerThreshold: opts.LowerThreshold,
 		skipTags:       opts.SkipTags,
+		maxDeletions:   opts.MaxDeletions,
 	}
 }
 
@@ -128,6 +132,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	d.logger.Info("Found used Grafana dashboards", slog.Int("count", len(used)))
 	usedDashboards := d.usedMap(used)
 	var deleted []string
+	var skippedDueToLimit int
 
 	for i := range all {
 		dashboard := &all[i]
@@ -167,12 +172,26 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 			continue
 		}
 
+		limitExceeded := d.maxDeletions != nil && len(deleted) >= *d.maxDeletions
+		if limitExceeded {
+			skippedDueToLimit++
+			continue
+		}
+
 		dashboardLogger.Info("Deleting unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
 		if err := d.grafana.DeleteDashboard(ctx, dashboard.Namespace, dashboard.Name, dashboard.Spec); err != nil {
 			return fmt.Errorf("deleting unused dashboard %s: %w", dashboard.UID, err)
 		}
 		dashboardLogger.Info("Deleted unused dashboard", slog.String("raw_json", string(dashboard.Spec)))
 		deleted = append(deleted, fmt.Sprintf("%s/%s", dashboard.Namespace, dashboard.Name))
+	}
+
+	if skippedDueToLimit > 0 {
+		d.logger.Info(
+			"Reached maximum deletion limit",
+			slog.Int("max_deletions", *d.maxDeletions),
+			slog.Int("remaining_unused_dashboards", skippedDueToLimit),
+		)
 	}
 
 	d.logger.Info(
