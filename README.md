@@ -133,7 +133,7 @@ prune:
   # deleting for that run.
   #
   # Must be at least 1 if set. Omit this option for unlimited deletions. Use 'dry: true' if you want Frigg to delete
-  # no dashboards at all.
+  # no dashboards at all. This option has no effect on dry runs.
   #
   # Optional.
   max_deletions: 10
