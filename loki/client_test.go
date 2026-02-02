@@ -5,6 +5,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -16,27 +17,33 @@ import (
 )
 
 type mockHTTPClient struct {
-	response    *http.Response
+	responses   []*http.Response
 	err         error
 	lastRequest *http.Request
+	callCount   int
 }
 
 func (m *mockHTTPClient) Do(req *http.Request) (*http.Response, error) {
 	m.lastRequest = req
-	return m.response, m.err
+	if m.err != nil {
+		return nil, m.err
+	}
+	resp := m.responses[m.callCount]
+	m.callCount++
+	return resp, nil
 }
 
 func TestClient_QueryRange(t *testing.T) {
 	t.Parallel()
 
 	tests := map[string]struct {
-		endpoint    string
-		query       string
-		start       time.Time
-		end         time.Time
-		clientResp  *http.Response
-		clientErr   error
-		expectedErr string
+		endpoint        string
+		query           string
+		start           time.Time
+		end             time.Time
+		clientResponses []*http.Response
+		clientErr       error
+		expectedErr     string
 	}{
 		"invalid endpoint url": {
 			endpoint: "http://localhost:1234\t\n",
@@ -59,9 +66,11 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusInternalServerError,
-				Body:       io.NopCloser(strings.NewReader("internal server error")),
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusInternalServerError,
+					Body:       io.NopCloser(strings.NewReader("internal server error")),
+				},
 			},
 			expectedErr: "unexpected status code: 500, body: internal server error",
 		},
@@ -70,9 +79,11 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(&errorReader{errors.New("read error")}),
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(&errorReader{errors.New("read error")}),
+				},
 			},
 			expectedErr: "reading response body: read error",
 		},
@@ -81,9 +92,11 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader("not json")),
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader("not json")),
+				},
 			},
 			expectedErr: "unmarshalling response: invalid character 'o' in literal null (expecting 'u')",
 		},
@@ -92,9 +105,11 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusOK,
-				Body:       io.NopCloser(strings.NewReader(`{"status":"error","error":"query timeout"}`)),
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body:       io.NopCloser(strings.NewReader(`{"status":"error","error":"query timeout"}`)),
+				},
 			},
 			expectedErr: "query failed with status: error",
 		},
@@ -103,9 +118,10 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
 					"status": "success",
 					"data": {
 						"resultType": "streams",
@@ -117,6 +133,7 @@ func TestClient_QueryRange(t *testing.T) {
 						]
 					}
 				}`)),
+				},
 			},
 			expectedErr: "invalid value format in Loki response: [only one value]",
 		},
@@ -125,9 +142,10 @@ func TestClient_QueryRange(t *testing.T) {
 			query:    `{app="test"}`,
 			start:    time.Now().Add(-1 * time.Hour),
 			end:      time.Now(),
-			clientResp: &http.Response{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
+			clientResponses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
 					"status": "success",
 					"data": {
 						"resultType": "streams",
@@ -139,6 +157,7 @@ func TestClient_QueryRange(t *testing.T) {
 						]
 					}
 				}`)),
+				},
 			},
 			expectedErr: "parsing timestamp \"not-a-timestamp\": strconv.ParseInt: parsing \"not-a-timestamp\": invalid syntax",
 		},
@@ -150,8 +169,9 @@ func TestClient_QueryRange(t *testing.T) {
 
 			client := loki.NewClient(loki.ClientOptions{
 				Endpoint:   tc.endpoint,
-				HTTPClient: &mockHTTPClient{response: tc.clientResp, err: tc.clientErr},
+				HTTPClient: &mockHTTPClient{responses: tc.clientResponses, err: tc.clientErr},
 				Logger:     slog.Default(),
+				Limit:      100,
 			})
 
 			logs, err := client.QueryRange(t.Context(), tc.query, tc.start, tc.end)
@@ -163,10 +183,9 @@ func TestClient_QueryRange(t *testing.T) {
 	t.Run("successful request", func(t *testing.T) {
 		t.Parallel()
 
-		client := loki.NewClient(loki.ClientOptions{
-			Endpoint: "http://localhost:1234",
-			HTTPClient: &mockHTTPClient{
-				response: &http.Response{
+		mock := &mockHTTPClient{
+			responses: []*http.Response{
+				{
 					StatusCode: http.StatusOK,
 					Body: io.NopCloser(strings.NewReader(`{
 						"status": "success",
@@ -185,7 +204,13 @@ func TestClient_QueryRange(t *testing.T) {
 					}`)),
 				},
 			},
-			Logger: slog.Default(),
+		}
+
+		client := loki.NewClient(loki.ClientOptions{
+			Endpoint:   "http://localhost:1234",
+			HTTPClient: mock,
+			Logger:     slog.Default(),
+			Limit:      100,
 		})
 
 		logs, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
@@ -199,21 +224,27 @@ func TestClient_QueryRange(t *testing.T) {
 		assert.Equal(t, "log message 2", logs[1].Message())
 		assert.Equal(t, time.Date(2021, 1, 1, 0, 0, 1, 0, time.UTC), logs[1].Timestamp())
 		assert.Equal(t, map[string]string{"app": "test", "env": "prod"}, logs[1].Stream())
+
+		require.NotNil(t, mock.lastRequest)
+		assert.Equal(t, "100", mock.lastRequest.URL.Query().Get("limit"))
+		assert.Equal(t, "forward", mock.lastRequest.URL.Query().Get("direction"))
 	})
 
 	t.Run("sets X-Scope-OrgID header when tenant ID is configured", func(t *testing.T) {
 		t.Parallel()
 
 		mock := &mockHTTPClient{
-			response: &http.Response{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
+			responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
 					"status": "success",
 					"data": {
 						"resultType": "streams",
 						"result": []
 					}
 				}`)),
+				},
 			},
 		}
 
@@ -222,6 +253,7 @@ func TestClient_QueryRange(t *testing.T) {
 			TenantID:   "my-tenant",
 			HTTPClient: mock,
 			Logger:     slog.Default(),
+			Limit:      100,
 		})
 
 		_, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
@@ -235,15 +267,17 @@ func TestClient_QueryRange(t *testing.T) {
 		t.Parallel()
 
 		mock := &mockHTTPClient{
-			response: &http.Response{
-				StatusCode: http.StatusOK,
-				Body: io.NopCloser(strings.NewReader(`{
+			responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
 					"status": "success",
 					"data": {
 						"resultType": "streams",
 						"result": []
 					}
 				}`)),
+				},
 			},
 		}
 
@@ -251,6 +285,7 @@ func TestClient_QueryRange(t *testing.T) {
 			Endpoint:   "http://localhost:1234",
 			HTTPClient: mock,
 			Logger:     slog.Default(),
+			Limit:      100,
 		})
 
 		_, err := client.QueryRange(t.Context(), `{app="test"}`, time.Now().Add(-1*time.Hour), time.Now())
@@ -259,6 +294,82 @@ func TestClient_QueryRange(t *testing.T) {
 		require.NotNil(t, mock.lastRequest)
 		assert.Empty(t, mock.lastRequest.Header.Get("X-Scope-OrgID"))
 	})
+
+	t.Run("paginates through multiple pages of results", func(t *testing.T) {
+		t.Parallel()
+
+		// First page returns exactly limit (2) results, second page returns fewer.
+		mock := &mockHTTPClient{
+			responses: []*http.Response{
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"status": "success",
+						"data": {
+							"resultType": "streams",
+							"result": [
+								{
+									"stream": {"app": "test"},
+									"values": [
+										["1609459200000000000", "log 1"],
+										["1609459201000000000", "log 2"]
+									]
+								}
+							]
+						}
+					}`)),
+				},
+				{
+					StatusCode: http.StatusOK,
+					Body: io.NopCloser(strings.NewReader(`{
+						"status": "success",
+						"data": {
+							"resultType": "streams",
+							"result": [
+								{
+									"stream": {"app": "test"},
+									"values": [
+										["1609459202000000000", "log 3"]
+									]
+								}
+							]
+						}
+					}`)),
+				},
+			},
+		}
+
+		client := loki.NewClient(loki.ClientOptions{
+			Endpoint:   "http://localhost:1234",
+			HTTPClient: mock,
+			Logger:     slog.Default(),
+			Limit:      2,
+		})
+
+		start := time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC)
+		end := time.Date(2021, 1, 1, 1, 0, 0, 0, time.UTC)
+
+		logs, err := client.QueryRange(t.Context(), `{app="test"}`, start, end)
+		require.NoError(t, err)
+		assert.Len(t, logs, 3)
+		assert.Equal(t, 2, mock.callCount)
+
+		assert.Equal(t, "log 1", logs[0].Message())
+		assert.Equal(t, "log 2", logs[1].Message())
+		assert.Equal(t, "log 3", logs[2].Message())
+
+		// Verify the second request had an updated start time (1 nanosecond after log 2).
+		expectedSecondStart := time.Date(2021, 1, 1, 0, 0, 1, 1, time.UTC)
+		actualStart := mock.lastRequest.URL.Query().Get("start")
+		assert.Equal(t, expectedSecondStart.UnixNano(), mustParseInt64(t, actualStart))
+	})
+}
+
+func mustParseInt64(t *testing.T, s string) int64 {
+	t.Helper()
+	v, err := strconv.ParseInt(s, 10, 64)
+	require.NoError(t, err)
+	return v
 }
 
 // errorReader is a simple io.Reader that always returns an error.

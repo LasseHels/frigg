@@ -161,6 +161,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		TenantID:   c.Loki.TenantID,
 		HTTPClient: httpClient,
 		Logger:     logger,
+		Limit:      100,
 	})
 
 	grafanaURL := mustParseURL(c.Grafana.Endpoint)
