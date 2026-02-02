@@ -97,6 +97,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 				assert.Equal(t, map[string]string{"app": "grafana"}, labels)
 				assert.Equal(t, 24*time.Hour, r)
 				assert.Equal(t, []string{"admin"}, opts.IgnoredUsers)
+				assert.Equal(t, 2*time.Hour, opts.ChunkSize)
 				return nil, nil
 			},
 		}
@@ -111,6 +112,7 @@ func TestDashboardPruner_Prune(t *testing.T) {
 			IgnoredUsers: []string{"admin"},
 			Period:       24 * time.Hour,
 			Labels:       map[string]string{"app": "grafana"},
+			ChunkSize:    2 * time.Hour,
 		})
 
 		err := pruner.prune(t.Context())

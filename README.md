@@ -98,6 +98,15 @@ prune:
   #
   # Required.
   period: '1440h'
+  # The size of time chunks when querying Loki for dashboard usage logs. To avoid executing a single large query,
+  # Frigg splits queries into smaller chunks of this size.
+  #
+  # If chunk_size exceeds period, it will be truncated to match period.
+  #
+  # This value must be a valid Go duration string. Minimum value is 10 minutes.
+  #
+  # Optional (default: "4h").
+  chunk_size: '4h'
   # Labels that identify Grafana logs in Loki. For example, if labels are set to app: 'grafana' and env: 'production',
   # then Frigg will query Grafana logs in Loki with the selector {app="grafana", env="production"}.
   #

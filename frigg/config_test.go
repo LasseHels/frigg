@@ -1,6 +1,7 @@
 package frigg_test
 
 import (
+	"bytes"
 	"log/slog"
 	"testing"
 	"time"
@@ -66,6 +67,7 @@ func TestNewConfig(t *testing.T) {
 						},
 					},
 					MaxDeletions: intPtr(25),
+					ChunkSize:    4 * time.Hour,
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -102,6 +104,7 @@ func TestNewConfig(t *testing.T) {
 						"app": "grafana",
 					},
 					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -137,6 +140,7 @@ func TestNewConfig(t *testing.T) {
 						"app": "grafana",
 					},
 					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -259,6 +263,7 @@ func TestNewConfig(t *testing.T) {
 						"app": "grafana",
 					},
 					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
 				},
 				Backup: frigg.BackupConfig{
 					GitHub: github.Config{
@@ -317,6 +322,80 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Prune.MaxDeletions' Error:" +
 				"Field validation for 'MaxDeletions' failed on the 'min' tag",
 		},
+		"chunk size below minimum": {
+			configPath:     "testdata/chunk_size_below_minimum.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.ChunkSize' Error:" +
+				"Field validation for 'ChunkSize' failed on the 'min' tag",
+		},
+		"chunk size at minimum": {
+			configPath: "testdata/chunk_size_at_minimum.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:            true,
+					Interval:       10 * time.Minute,
+					Period:         720 * time.Hour,
+					Labels:         map[string]string{"app": "grafana"},
+					LowerThreshold: 10,
+					ChunkSize:      10 * time.Minute,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"chunk size custom value": {
+			configPath: "testdata/chunk_size_custom.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint: "http://loki.example.com",
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:            true,
+					Interval:       10 * time.Minute,
+					Period:         720 * time.Hour,
+					Labels:         map[string]string{"app": "grafana"},
+					LowerThreshold: 10,
+					ChunkSize:      2 * time.Hour,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
 	}
 
 	for name, tt := range tests {
@@ -358,6 +437,7 @@ func TestNewConfig(t *testing.T) {
 					"app": "grafana",
 				},
 				LowerThreshold: 10,
+				ChunkSize:      4 * time.Hour,
 			},
 			Backup: frigg.BackupConfig{
 				GitHub: github.Config{
@@ -516,6 +596,115 @@ func TestNewSecrets(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestConfig_Initialise_ChunkSizeTruncation(t *testing.T) {
+	t.Parallel()
+
+	t.Run("truncates chunk size to period when chunk size exceeds period", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := frigg.NewConfig("testdata/chunk_size_exceeds_period.yaml")
+		require.NoError(t, err)
+
+		assert.Equal(t, 2*time.Hour, cfg.Prune.ChunkSize)
+		assert.Equal(t, time.Hour, cfg.Prune.Period)
+
+		var logBuf bytes.Buffer
+		handler := slog.NewJSONHandler(&logBuf, nil)
+		logger := slog.New(handler)
+
+		secrets := &frigg.Secrets{
+			Grafana: grafana.Secrets{
+				Tokens: map[string]string{
+					"default": "test-token",
+				},
+			},
+			Backup: frigg.BackupSecrets{
+				GitHub: github.Secrets{
+					Token: "ghp_test",
+				},
+			},
+		}
+
+		_, err = cfg.Initialise(logger, nil, secrets)
+		require.NoError(t, err)
+
+		assert.Equal(t, time.Hour, cfg.Prune.ChunkSize)
+
+		logOutput := logBuf.String()
+		assert.Contains(t, logOutput, "Chunk size exceeds period, truncating to period")
+		assert.Contains(t, logOutput, `"configured_chunk_size":7200000000000`)
+		assert.Contains(t, logOutput, `"period":3600000000000`)
+	})
+
+	t.Run("does not truncate when chunk size equals period", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := frigg.NewConfig("testdata/chunk_size_at_minimum.yaml")
+		require.NoError(t, err)
+
+		cfg.Prune.ChunkSize = cfg.Prune.Period
+
+		var logBuf bytes.Buffer
+		handler := slog.NewJSONHandler(&logBuf, nil)
+		logger := slog.New(handler)
+
+		secrets := &frigg.Secrets{
+			Grafana: grafana.Secrets{
+				Tokens: map[string]string{
+					"default": "test-token",
+				},
+			},
+			Backup: frigg.BackupSecrets{
+				GitHub: github.Secrets{
+					Token: "ghp_test",
+				},
+			},
+		}
+
+		_, err = cfg.Initialise(logger, nil, secrets)
+		require.NoError(t, err)
+
+		assert.Equal(t, cfg.Prune.Period, cfg.Prune.ChunkSize)
+
+		logOutput := logBuf.String()
+		assert.NotContains(t, logOutput, "Chunk size exceeds period")
+	})
+
+	t.Run("does not truncate when chunk size is less than period", func(t *testing.T) {
+		t.Parallel()
+
+		cfg, err := frigg.NewConfig("testdata/chunk_size_custom.yaml")
+		require.NoError(t, err)
+
+		originalChunkSize := cfg.Prune.ChunkSize
+
+		var logBuf bytes.Buffer
+		handler := slog.NewJSONHandler(&logBuf, nil)
+		logger := slog.New(handler)
+
+		secrets := &frigg.Secrets{
+			Grafana: grafana.Secrets{
+				Tokens: map[string]string{
+					"default": "test-token",
+				},
+			},
+			Backup: frigg.BackupSecrets{
+				GitHub: github.Secrets{
+					Token: "ghp_test",
+				},
+			},
+		}
+
+		_, err = cfg.Initialise(logger, nil, secrets)
+		require.NoError(t, err)
+
+		assert.Equal(t, originalChunkSize, cfg.Prune.ChunkSize)
+
+		logOutput := logBuf.String()
+		assert.NotContains(t, logOutput, "Chunk size exceeds period")
+	})
 }
 
 func exampleRepository(t testing.TB) github.Repository {

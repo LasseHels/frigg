@@ -89,6 +89,7 @@ func (c *Config) defaults() {
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
+	c.Prune.ChunkSize = 4 * time.Hour
 	c.Backup.GitHub.Branch = "main"
 	c.Backup.GitHub.Directory = "deleted-dashboards"
 }
@@ -152,6 +153,15 @@ func mustParseURL(rawURL string) *url.URL {
 // Initialise Frigg from the provided Config.
 // This assumes that the provided Config has already been validated and might panic if not.
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
+	if c.Prune.ChunkSize > c.Prune.Period {
+		logger.Info(
+			"Chunk size exceeds period, truncating to period",
+			slog.Duration("configured_chunk_size", c.Prune.ChunkSize),
+			slog.Duration("period", c.Prune.Period),
+		)
+		c.Prune.ChunkSize = c.Prune.Period
+	}
+
 	s := server.New(c.Server, logger)
 
 	httpClient := &http.Client{}
@@ -201,6 +211,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			LowerThreshold: c.Prune.LowerThreshold,
 			SkipTags:       skipTags,
 			MaxDeletions:   c.Prune.MaxDeletions,
+			ChunkSize:      c.Prune.ChunkSize,
 		})
 		pruners = append(pruners, pruner)
 	}
