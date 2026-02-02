@@ -59,6 +59,10 @@ func NewConfig(path string) (*Config, error) {
 		return nil, errors.Wrap(err, "validating configuration")
 	}
 
+	if c.Prune.ChunkSize > c.Prune.Period {
+		c.Prune.ChunkSize = c.Prune.Period
+	}
+
 	return c, nil
 }
 
@@ -153,15 +157,6 @@ func mustParseURL(rawURL string) *url.URL {
 // Initialise Frigg from the provided Config.
 // This assumes that the provided Config has already been validated and might panic if not.
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
-	if c.Prune.ChunkSize > c.Prune.Period {
-		logger.Info(
-			"Chunk size exceeds period, truncating to period",
-			slog.Duration("configured_chunk_size", c.Prune.ChunkSize),
-			slog.Duration("period", c.Prune.Period),
-		)
-		c.Prune.ChunkSize = c.Prune.Period
-	}
-
 	s := server.New(c.Server, logger)
 
 	httpClient := &http.Client{}
