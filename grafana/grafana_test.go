@@ -114,13 +114,14 @@ func TestClient_UsedDashboards(t *testing.T) {
 			labels:          map[string]string{"app": "grafana"},
 			expectedErrText: "could not find path in stream labels: map[uname:user1]",
 		},
-		"invalid path format": {
+		"invalid path structure": {
 			mockLogs: []loki.Log{
 				loki.NewLog(
 					time.Now(),
 					"log message",
 					map[string]string{
-						"path":  "/invalid/path",
+						// Path has correct part count (8) but wrong structure (third part should be "dashboard.grafana.app").
+						"path":  "/apis/wrong.app/v1beta1/namespaces/default/dashboards/dashboard1",
 						"uname": "user1",
 					},
 				),
@@ -128,9 +129,8 @@ func TestClient_UsedDashboards(t *testing.T) {
 			mockErr:        nil,
 			lowerThreshold: 1,
 			labels:         map[string]string{"app": "grafana"},
-			expectedErrText: `extracting variables from path "/invalid/path": expected part count 8 but got 3: ` +
-				`unexpected path format: "/invalid/path", expected format ` +
-				`"/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"`,
+			//nolint:lll
+			expectedErrText: `extracting variables from path "/apis/wrong.app/v1beta1/namespaces/default/dashboards/dashboard1": expected third part "dashboard.grafana.app" but got "wrong.app": unexpected path format: "/apis/wrong.app/v1beta1/namespaces/default/dashboards/dashboard1", expected format "/apis/dashboard.grafana.app/v1beta1/namespaces/:namespace/dashboards/:uid"`,
 		},
 	}
 
@@ -568,6 +568,124 @@ func TestClient_UsedDashboards(t *testing.T) {
 		assert.Equal(t, "dashboard1", results[0].Name())
 		assert.Equal(t, 1, results[0].Reads())
 		assert.Equal(t, 0, results[0].Users())
+	})
+
+	t.Run("skips logs with unexpected path part count", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			// Valid log.
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard1",
+					"uname": "user1",
+				},
+			),
+			// Malformed path (missing dashboard name).
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dto",
+					"uname": "user2",
+				},
+			),
+			// Another valid log.
+			loki.NewLog(
+				time.Now(),
+				"log message 3",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dashboard2",
+					"uname": "user1",
+				},
+			),
+			// Another malformed path (too few parts).
+			loki.NewLog(
+				time.Now(),
+				"log message 4",
+				map[string]string{
+					"path":  "/invalid/path",
+					"uname": "user3",
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "kiwi",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+		}
+
+		// Should succeed and return only the valid dashboards.
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+
+		assert.Equal(t, "dashboard1", results[0].Name())
+		assert.Equal(t, "default", results[0].Namespace())
+		assert.Equal(t, 1, results[0].Reads())
+		assert.Equal(t, 1, results[0].Users())
+
+		assert.Equal(t, "dashboard2", results[1].Name())
+		assert.Equal(t, "default", results[1].Namespace())
+		assert.Equal(t, 1, results[1].Reads())
+		assert.Equal(t, 1, results[1].Users())
+	})
+
+	t.Run("returns empty results when all logs have malformed paths", func(t *testing.T) {
+		t.Parallel()
+
+		logs := []loki.Log{
+			loki.NewLog(
+				time.Now(),
+				"log message 1",
+				map[string]string{
+					"path":  "/invalid/path",
+					"uname": "user1",
+				},
+			),
+			loki.NewLog(
+				time.Now(),
+				"log message 2",
+				map[string]string{
+					"path":  "/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/dto",
+					"uname": "user2",
+				},
+			),
+		}
+
+		client := &mockClient{
+			logs: logs,
+			err:  nil,
+		}
+
+		g, err := grafana.NewClient(&grafana.NewClientOptions{
+			Logger: slog.Default(),
+			Client: client,
+			Token:  "grape",
+		})
+		require.NoError(t, err)
+
+		opts := grafana.UsedDashboardsOptions{
+			LowerThreshold: 1,
+		}
+
+		// Should succeed but return empty results since all logs have malformed paths.
+		results, err := g.UsedDashboards(t.Context(), map[string]string{"app": "grafana"}, time.Hour, opts)
+		require.NoError(t, err)
+		assert.Empty(t, results)
 	})
 }
 
