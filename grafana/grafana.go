@@ -29,6 +29,9 @@ type storage interface {
 	BackUpDashboard(ctx context.Context, namespace, name string, dashboardJSON []byte) error
 }
 
+// errUnexpectedPathPartCount is returned by extractPathVariables when the path has an unexpected number of parts.
+var errUnexpectedPathPartCount = errors.New("unexpected path part count")
+
 type Client struct {
 	logger     *slog.Logger
 	client     client
@@ -185,7 +188,12 @@ func extractPathVariables(path string) (DashboardKey, error) {
 	expectedPartCount := 8
 	actualPartCount := len(pathParts)
 	if actualPartCount != expectedPartCount {
-		return DashboardKey{}, errors.Wrapf(err, "expected part count %d but got %d", expectedPartCount, actualPartCount)
+		return DashboardKey{}, fmt.Errorf(
+			"expected part count %d but got %d: %w",
+			expectedPartCount,
+			actualPartCount,
+			errUnexpectedPathPartCount,
+		)
 	}
 
 	expectedThirdPart := "dashboard.grafana.app"
@@ -269,7 +277,7 @@ func (c *Client) UsedDashboards(
 		ignoredUsers[user] = struct{}{}
 	}
 
-	return processLogs(logs, ignoredUsers)
+	return c.processLogs(logs, ignoredUsers)
 }
 
 // buildLogQuery constructs a LogQL query for finding dashboard read logs.
@@ -322,7 +330,7 @@ func (c *Client) queryLogs(
 
 // processLogs extracts dashboard read information from Grafana logs.
 // It returns a slice of DashboardReads sorted by dashboard name.
-func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]DashboardReads, error) {
+func (c *Client) processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]DashboardReads, error) {
 	readsByUID := make(map[DashboardKey]map[string]struct{})
 	readCounts := make(map[DashboardKey]int)
 
@@ -335,8 +343,14 @@ func processLogs(logs []loki.Log, ignoredUsers map[string]struct{}) ([]Dashboard
 		}
 
 		key, err := extractPathVariables(path)
+		if errors.Is(err, errUnexpectedPathPartCount) {
+			c.logger.Info("Skipping log with unexpected path format",
+				slog.String("path", path),
+				slog.String("error", err.Error()))
+			continue
+		}
 		if err != nil {
-			return nil, errors.Wrapf(err, "extracting variables from path %q", path)
+			return nil, fmt.Errorf("extracting variables from path %q: %w", path, err)
 		}
 
 		// A log line is not guaranteed to have a username. If a user attempts to open a dashboard with an expired
