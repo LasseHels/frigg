@@ -86,8 +86,7 @@ type queryRangeResponse struct {
 	Data   queryRangeData `json:"data"`
 }
 
-// QueryRange queries Loki logs over a range of time and automatically paginates
-// through all results.
+// QueryRange queries Loki logs over a range of time and automatically paginates through all results.
 //
 // See [Loki API documentation].
 //
