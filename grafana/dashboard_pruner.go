@@ -31,6 +31,7 @@ type DashboardPruner struct {
 	lowerThreshold int
 	skipTags       []string
 	maxDeletions   *int
+	chunkSize      time.Duration
 }
 
 type NewDashboardPrunerOptions struct {
@@ -61,6 +62,9 @@ type NewDashboardPrunerOptions struct {
 	SkipTags []string
 	// MaxDeletions is the maximum number of dashboards to delete per pruning run. If nil, there is no limit.
 	MaxDeletions *int
+	// ChunkSize is the size of time chunks when querying Loki for dashboard usage logs.
+	// See also UsedDashboardsOptions.ChunkSize.
+	ChunkSize time.Duration
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
@@ -81,6 +85,7 @@ func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 		lowerThreshold: opts.LowerThreshold,
 		skipTags:       opts.SkipTags,
 		maxDeletions:   opts.MaxDeletions,
+		chunkSize:      opts.ChunkSize,
 	}
 }
 
@@ -123,6 +128,7 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 	opts := UsedDashboardsOptions{
 		IgnoredUsers:   d.ignoredUsers,
 		LowerThreshold: d.lowerThreshold,
+		ChunkSize:      d.chunkSize,
 	}
 	used, err := d.grafana.UsedDashboards(ctx, d.labels, d.period, opts)
 	if err != nil {

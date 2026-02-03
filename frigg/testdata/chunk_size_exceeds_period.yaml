@@ -1,0 +1,15 @@
+loki:
+  endpoint: 'http://loki.example.com'
+
+grafana:
+  endpoint: 'http://example.com'
+
+prune:
+  period: '1h'
+  labels:
+    app: 'grafana'
+  chunk_size: '2h'
+
+backup:
+  github:
+    repository: 'octocat/hello-world'

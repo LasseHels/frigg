@@ -59,6 +59,10 @@ func NewConfig(path string) (*Config, error) {
 		return nil, errors.Wrap(err, "validating configuration")
 	}
 
+	if c.Prune.ChunkSize > c.Prune.Period {
+		c.Prune.ChunkSize = c.Prune.Period
+	}
+
 	return c, nil
 }
 
@@ -89,6 +93,7 @@ func (c *Config) defaults() {
 	c.Prune.Dry = true
 	c.Prune.Interval = 10 * time.Minute
 	c.Prune.LowerThreshold = 10
+	c.Prune.ChunkSize = 4 * time.Hour
 	c.Backup.GitHub.Branch = "main"
 	c.Backup.GitHub.Directory = "deleted-dashboards"
 }
@@ -201,6 +206,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 			LowerThreshold: c.Prune.LowerThreshold,
 			SkipTags:       skipTags,
 			MaxDeletions:   c.Prune.MaxDeletions,
+			ChunkSize:      c.Prune.ChunkSize,
 		})
 		pruners = append(pruners, pruner)
 	}

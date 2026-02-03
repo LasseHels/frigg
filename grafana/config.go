@@ -15,6 +15,9 @@ type PruneConfig struct {
 	LowerThreshold int               `yaml:"lower_threshold" validate:"min=0"`
 	Skip           *SkipConfig       `yaml:"skip"`
 	MaxDeletions   *int              `yaml:"max_deletions" validate:"omitempty,min=1"`
+	// ChunkSize has a minimum value of 10 minutes (600000000000 nanoseconds).
+	// 10 minutes was chosen to avoid overwhelming the Loki API with a flurry of requests.
+	ChunkSize time.Duration `yaml:"chunk_size" validate:"omitempty,min=600000000000"`
 }
 
 type SkipConfig struct {
