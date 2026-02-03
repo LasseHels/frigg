@@ -75,6 +75,16 @@ loki:
     #
     # Optional.
     tenant_id: 'my-tenant'
+    # Maximum number of log entries to fetch per request when querying Loki. Frigg automatically paginates through
+    # results, so this acts as the batch size rather than a hard limit on total results.
+    #
+    # Must be at least 1 if set. This value must not exceed Loki's server-side limit (max_entries_limit_per_query),
+    # which defaults to 5000. If query_limit exceeds Loki's max, Frigg will receive an error when querying Loki.
+    #
+    # See https://grafana.com/docs/loki/v2.9.x/configure/#limits_config for Loki configuration details.
+    #
+    # Optional (default: 100).
+    query_limit: 100
 
 prune:
   # If dry is set to true, the dashboard pruner will only log unused dashboards instead of deleting them (default: true).

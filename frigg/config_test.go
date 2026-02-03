@@ -27,8 +27,8 @@ func TestNewConfig(t *testing.T) {
 		"empty config file": {
 			configPath:     "testdata/empty_config.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki' Error:" +
-				"Field validation for 'Loki' failed on the 'required' tag; Key: 'Config.Grafana' Error:" +
+			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag; Key: 'Config.Grafana' Error:" +
 				"Field validation for 'Grafana' failed on the 'required' tag; Key: 'Config.Prune.Period' Error:" +
 				"Field validation for 'Period' failed on the 'required' tag; Key: 'Config.Prune.Labels' Error:" +
 				"Field validation for 'Labels' failed on the 'required' tag; Key: 'Config.Backup.GitHub.Repository' Error:" +
@@ -45,7 +45,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 9898,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -90,7 +91,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 9876,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -126,7 +128,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -193,8 +196,8 @@ func TestNewConfig(t *testing.T) {
 		"missing loki endpoint": {
 			configPath:     "testdata/missing_loki_endpoint.yaml",
 			expectedConfig: nil,
-			expectedError: "validating configuration: Key: 'Config.Loki' Error:" +
-				"Field validation for 'Loki' failed on the 'required' tag",
+			expectedError: "validating configuration: Key: 'Config.Loki.Endpoint' Error:" +
+				"Field validation for 'Endpoint' failed on the 'required' tag",
 		},
 		"missing prune period": {
 			configPath:     "testdata/missing_prune_period.yaml",
@@ -249,7 +252,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -338,7 +342,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -372,7 +377,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -406,7 +412,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -440,7 +447,8 @@ func TestNewConfig(t *testing.T) {
 					Port: 8080,
 				},
 				Loki: loki.Config{
-					Endpoint: "http://loki.example.com",
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
 				},
 				Grafana: grafana.Config{
 					Endpoint: "http://example.com",
@@ -462,6 +470,53 @@ func TestNewConfig(t *testing.T) {
 				},
 			},
 			expectedError: "",
+		},
+		"query limit custom value": {
+			configPath: "testdata/query_limit_custom.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(500),
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:            true,
+					Interval:       10 * time.Minute,
+					Period:         720 * time.Hour,
+					Labels:         map[string]string{"app": "grafana"},
+					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"query limit zero": {
+			configPath:     "testdata/query_limit_zero.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Loki.QueryLimit' Error:" +
+				"Field validation for 'QueryLimit' failed on the 'min' tag",
+		},
+		"query limit negative": {
+			configPath:     "testdata/query_limit_negative.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Loki.QueryLimit' Error:" +
+				"Field validation for 'QueryLimit' failed on the 'min' tag",
 		},
 	}
 
@@ -491,7 +546,8 @@ func TestNewConfig(t *testing.T) {
 				Port: 1111,
 			},
 			Loki: loki.Config{
-				Endpoint: "http://loki.example.com",
+				Endpoint:   "http://loki.example.com",
+				QueryLimit: intPtr(100),
 			},
 			Grafana: grafana.Config{
 				Endpoint: "http://example.com",
