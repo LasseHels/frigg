@@ -10,8 +10,6 @@ import (
 	"net/url"
 	"strconv"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 type httpClient interface {
@@ -23,6 +21,7 @@ type ClientOptions struct {
 	TenantID   string
 	HTTPClient httpClient
 	Logger     *slog.Logger
+	Limit      int
 }
 
 type Client struct {
@@ -30,6 +29,7 @@ type Client struct {
 	tenantID string
 	client   httpClient
 	logger   *slog.Logger
+	limit    int
 }
 
 func NewClient(opts ClientOptions) *Client {
@@ -38,6 +38,7 @@ func NewClient(opts ClientOptions) *Client {
 		tenantID: opts.TenantID,
 		client:   opts.HTTPClient,
 		logger:   opts.Logger,
+		limit:    opts.Limit,
 	}
 }
 
@@ -85,24 +86,59 @@ type queryRangeResponse struct {
 	Data   queryRangeData `json:"data"`
 }
 
-// QueryRange queries Loki logs over a range of time.
+// QueryRange queries Loki logs over a range of time and automatically paginates through all results.
 //
-// See https://grafana.com/docs/loki/v2.9.x/reference/api/#query-loki-over-a-range-of-time.
+// See [Loki API documentation].
+//
+// [Loki API documentation]: https://grafana.com/docs/loki/v2.9.x/reference/api/#query-loki-over-a-range-of-time
 func (c *Client) QueryRange(ctx context.Context, query string, start, end time.Time) ([]Log, error) {
+	var allLogs []Log
+	currentStart := start
+
+	for {
+		logs, maxTimestamp, err := c.queryRangePage(ctx, query, currentStart, end)
+		if err != nil {
+			return nil, err
+		}
+
+		allLogs = append(allLogs, logs...)
+
+		done := len(logs) < c.limit
+		if done {
+			break
+		}
+
+		// Advance start time to 1 nanosecond after the maximum timestamp in the page.
+		//
+		// Unlikely edge case: a count of logs greater than the configured limit share the exact same nanosecond
+		// timestamp. For example, if the limit is 1000 and there are 1500 logs with timestamp T, the first query will
+		// return 1000 logs with timestamp T, and the next query will start at T + 1 nanosecond, missing the remaining
+		// 500 logs with timestamp T.
+		currentStart = maxTimestamp.Add(time.Nanosecond)
+	}
+
+	return allLogs, nil
+}
+
+// queryRangePage executes a single query_range request to Loki.
+// Returns the logs, the maximum timestamp among all logs (for pagination), and any error.
+func (c *Client) queryRangePage(ctx context.Context, query string, start, end time.Time) ([]Log, time.Time, error) {
 	u, err := url.Parse(fmt.Sprintf("%s/loki/api/v1/query_range", c.endpoint))
 	if err != nil {
-		return nil, errors.Wrap(err, "parsing URL")
+		return nil, time.Time{}, fmt.Errorf("parsing URL: %w", err)
 	}
 
 	q := u.Query()
 	q.Set("query", query)
 	q.Set("start", fmt.Sprintf("%d", start.UnixNano()))
 	q.Set("end", fmt.Sprintf("%d", end.UnixNano()))
+	q.Set("limit", strconv.Itoa(c.limit))
+	q.Set("direction", "forward")
 	u.RawQuery = q.Encode()
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), http.NoBody)
 	if err != nil {
-		return nil, errors.Wrap(err, "creating request")
+		return nil, time.Time{}, fmt.Errorf("creating request: %w", err)
 	}
 
 	if c.tenantID != "" {
@@ -111,7 +147,7 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return nil, errors.Wrap(err, "executing request")
+		return nil, time.Time{}, fmt.Errorf("executing request: %w", err)
 	}
 	defer func() {
 		_ = resp.Body.Close()
@@ -119,41 +155,46 @@ func (c *Client) QueryRange(ctx context.Context, query string, start, end time.T
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return nil, errors.Wrap(err, "reading response body")
+		return nil, time.Time{}, fmt.Errorf("reading response body: %w", err)
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
+		return nil, time.Time{}, fmt.Errorf("unexpected status code: %d, body: %s", resp.StatusCode, string(body))
 	}
 
 	var response queryRangeResponse
 	if err := json.Unmarshal(body, &response); err != nil {
-		return nil, errors.Wrap(err, "unmarshalling response")
+		return nil, time.Time{}, fmt.Errorf("unmarshalling response: %w", err)
 	}
 
 	if response.Status != "success" {
-		return nil, fmt.Errorf("query failed with status: %s", response.Status)
+		return nil, time.Time{}, fmt.Errorf("query failed with status: %s", response.Status)
 	}
 
 	var logs []Log
+	var maxTimestamp time.Time
 	for _, result := range response.Data.Result {
 		for _, value := range result.Values {
 			if len(value) != 2 {
-				return nil, fmt.Errorf("invalid value format in Loki response: %v", value)
+				return nil, time.Time{}, fmt.Errorf("invalid value format in Loki response: %v", value)
 			}
 
 			nanoseconds, err := strconv.ParseInt(value[0], 10, 64)
 			if err != nil {
-				return nil, errors.Wrap(err, fmt.Sprintf("parsing timestamp %q", value[0]))
+				return nil, time.Time{}, fmt.Errorf("parsing timestamp %q: %w", value[0], err)
 			}
 
 			timestamp := time.Unix(0, nanoseconds).UTC()
 			message := value[1]
+
+			if timestamp.After(maxTimestamp) {
+				maxTimestamp = timestamp
+			}
 
 			l := NewLog(timestamp, message, result.Stream)
 			logs = append(logs, l)
 		}
 	}
 
-	return logs, nil
+	return logs, maxTimestamp, nil
 }
