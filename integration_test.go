@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -177,20 +178,18 @@ func setup(t *testing.T) testEnvironment {
 	now := time.Now().UTC()
 	loki := integrationtest.NewLoki(t)
 	github := integrationtest.NewGitHub(t)
-	grafana := integrationtest.NewGrafana(
-		t,
-		&lokiLogConsumer{
-			loki: loki,
-			t:    t,
-			timestamps: map[string]time.Time{
-				"useddashboard":         now.Add(-5 * time.Minute),
-				"useddashboardapi":      now.Add(-6 * time.Minute),
-				"ignoreduserdashboard":  now.Add(-7 * time.Minute),
-				"unuseddashboard":       now.Add(-15 * time.Minute),
-				"purpleunuseddashboard": now.Add(-16 * time.Minute),
-			},
+	logConsumer := &lokiLogConsumer{
+		loki: loki,
+		t:    t,
+		timestamps: map[string]time.Time{
+			"useddashboard":         now.Add(-5 * time.Minute),
+			"useddashboardapi":      now.Add(-6 * time.Minute),
+			"ignoreduserdashboard":  now.Add(-7 * time.Minute),
+			"unuseddashboard":       now.Add(-15 * time.Minute),
+			"purpleunuseddashboard": now.Add(-16 * time.Minute),
 		},
-	)
+	}
+	grafana := integrationtest.NewGrafana(t, logConsumer)
 
 	orgID := grafana.CreateOrganisation(t, "purple")
 	purpleNamespace := fmt.Sprintf("org-%d", orgID)
@@ -245,6 +244,10 @@ backup:
 	}
 	err = loki.PushLogs(t.Context(), []integrationtest.LogEntry{anonymousViewLog})
 	require.NoError(t, err)
+
+	// Stop forwarding Grafana logs to Loki now that setup is complete.
+	// This prevents the test's assertion polling from creating "noise" logs that would interfere with the test.
+	logConsumer.Stop()
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
@@ -305,6 +308,13 @@ type lokiLogConsumer struct {
 	loki       *integrationtest.Loki
 	t          *testing.T
 	timestamps map[string]time.Time
+	stopped    atomic.Bool
+}
+
+// Stop stops the log consumer from forwarding logs to Loki.
+// Any logs received after Stop is called will be silently dropped.
+func (l *lokiLogConsumer) Stop() {
+	l.stopped.Store(true)
 }
 
 var dashboardPath = regexp.MustCompile(`/apis/dashboard\.grafana\.app/v1beta1/namespaces/[^/]+/dashboards/([^/\s]+)`)
@@ -330,6 +340,10 @@ func extractDashboardName(t *testing.T, logContent string) string {
 }
 
 func (l *lokiLogConsumer) Accept(log testcontainers.Log) {
+	if l.stopped.Load() {
+		return
+	}
+
 	timestamp := time.Now().UTC()
 	logContent := string(log.Content)
 
