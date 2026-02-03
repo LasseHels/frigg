@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -183,9 +184,10 @@ func setup(t *testing.T) testEnvironment {
 			t:    t,
 			timestamps: map[string]time.Time{
 				"useddashboard":         now.Add(-5 * time.Minute),
-				"ignoreduserdashboard":  now.Add(-5 * time.Minute),
+				"useddashboardapi":      now.Add(-6 * time.Minute),
+				"ignoreduserdashboard":  now.Add(-7 * time.Minute),
 				"unuseddashboard":       now.Add(-15 * time.Minute),
-				"purpleunuseddashboard": now.Add(-15 * time.Minute),
+				"purpleunuseddashboard": now.Add(-16 * time.Minute),
 			},
 		},
 	)
@@ -230,7 +232,7 @@ backup:
 	// Push a synthetic log line with an empty uname field to simulate an anonymous/failed auth view.
 	// This tests that Frigg handles missing uname gracefully and still counts it as a dashboard view.
 	anonymousViewLog := integrationtest.LogEntry{
-		Timestamp: now.Add(-5 * time.Minute),
+		Timestamp: now.Add(-8 * time.Minute),
 		Message: `logger=context userId=0 orgId=0 uname= t=2026-01-08T12:00:00.000000000Z level=info ` +
 			`msg="Request Completed" method=GET ` +
 			`path=/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/anonymousviewdashboard/dto ` +
@@ -302,16 +304,38 @@ func assertEqualKeys(t *testing.T, expected []string, actual map[string][]*http.
 type lokiLogConsumer struct {
 	loki       *integrationtest.Loki
 	t          *testing.T
-	timestamps map[string]time.Time
+	timestamps map[string]time.Time // dashboard name -> timestamp
+}
+
+var dashboardPathRe = regexp.MustCompile(`/apis/dashboard\.grafana\.app/v1beta1/namespaces/[^/]+/dashboards/([^/\s]+)`)
+
+// extractDashboardName extracts the dashboard name from a Grafana log line's path field.
+// Returns empty string if the log is not a dashboard request.
+func extractDashboardName(t *testing.T, logContent string) string {
+	// Make sure we only match dashboard read logs.
+	if !strings.Contains(logContent, "/dashboards/") {
+		return ""
+	}
+	if !strings.Contains(logContent, "method=GET") {
+		return ""
+	}
+	if !strings.Contains(logContent, `msg="Request Completed"`) {
+		return ""
+	}
+
+	matches := dashboardPathRe.FindStringSubmatch(logContent)
+	require.NotEmpty(t, matches, "log contains /dashboards/ but doesn't match expected path format: %s", logContent)
+
+	return matches[1]
 }
 
 func (l *lokiLogConsumer) Accept(log testcontainers.Log) {
 	timestamp := time.Now().UTC()
+	logContent := string(log.Content)
 
-	for matcher, at := range l.timestamps {
-		if strings.Contains(string(log.Content), matcher) {
-			timestamp = at
-			break
+	if name := extractDashboardName(l.t, logContent); name != "" {
+		if ts, ok := l.timestamps[name]; ok {
+			timestamp = ts
 		}
 	}
 
