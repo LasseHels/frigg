@@ -3,6 +3,7 @@ log:
 
 loki:
   endpoint: ${LOKI_ENDPOINT}
+  query_limit: 1
 
 grafana:
   endpoint: ${GRAFANA_ENDPOINT}

@@ -8,8 +8,10 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -176,19 +178,18 @@ func setup(t *testing.T) testEnvironment {
 	now := time.Now().UTC()
 	loki := integrationtest.NewLoki(t)
 	github := integrationtest.NewGitHub(t)
-	grafana := integrationtest.NewGrafana(
-		t,
-		&lokiLogConsumer{
-			loki: loki,
-			t:    t,
-			timestamps: map[string]time.Time{
-				"useddashboard":         now.Add(-5 * time.Minute),
-				"ignoreduserdashboard":  now.Add(-5 * time.Minute),
-				"unuseddashboard":       now.Add(-15 * time.Minute),
-				"purpleunuseddashboard": now.Add(-15 * time.Minute),
-			},
+	logConsumer := &lokiLogConsumer{
+		loki: loki,
+		t:    t,
+		timestamps: map[string]time.Time{
+			"useddashboard":         now.Add(-5 * time.Minute),
+			"useddashboardapi":      now.Add(-6 * time.Minute),
+			"ignoreduserdashboard":  now.Add(-7 * time.Minute),
+			"unuseddashboard":       now.Add(-15 * time.Minute),
+			"purpleunuseddashboard": now.Add(-16 * time.Minute),
 		},
-	)
+	}
+	grafana := integrationtest.NewGrafana(t, logConsumer)
 
 	orgID := grafana.CreateOrganisation(t, "purple")
 	purpleNamespace := fmt.Sprintf("org-%d", orgID)
@@ -230,7 +231,7 @@ backup:
 	// Push a synthetic log line with an empty uname field to simulate an anonymous/failed auth view.
 	// This tests that Frigg handles missing uname gracefully and still counts it as a dashboard view.
 	anonymousViewLog := integrationtest.LogEntry{
-		Timestamp: now.Add(-5 * time.Minute),
+		Timestamp: now.Add(-8 * time.Minute),
 		Message: `logger=context userId=0 orgId=0 uname= t=2026-01-08T12:00:00.000000000Z level=info ` +
 			`msg="Request Completed" method=GET ` +
 			`path=/apis/dashboard.grafana.app/v1beta1/namespaces/default/dashboards/anonymousviewdashboard/dto ` +
@@ -243,6 +244,10 @@ backup:
 	}
 	err = loki.PushLogs(t.Context(), []integrationtest.LogEntry{anonymousViewLog})
 	require.NoError(t, err)
+
+	// Stop forwarding Grafana logs to Loki now that setup is complete.
+	// This prevents the test's assertion polling from creating "noise" logs that would interfere with the test.
+	logConsumer.Stop()
 
 	t.Setenv("LOKI_ENDPOINT", fmt.Sprintf("http://%s", loki.Host()))
 	t.Setenv("GRAFANA_ENDPOINT", fmt.Sprintf("http://%s", grafana.Host()))
@@ -303,15 +308,48 @@ type lokiLogConsumer struct {
 	loki       *integrationtest.Loki
 	t          *testing.T
 	timestamps map[string]time.Time
+	stopped    atomic.Bool
+}
+
+// Stop stops the log consumer from forwarding logs to Loki.
+// Any logs received after Stop is called will be silently dropped.
+func (l *lokiLogConsumer) Stop() {
+	l.stopped.Store(true)
+}
+
+var dashboardPath = regexp.MustCompile(`/apis/dashboard\.grafana\.app/v1beta1/namespaces/[^/]+/dashboards/([^/\s]+)`)
+
+// extractDashboardName extracts the dashboard name from a Grafana log line's path field.
+// Returns empty string if the log is not a dashboard request.
+func extractDashboardName(t *testing.T, logContent string) string {
+	// Make sure we only match dashboard read logs.
+	if !strings.Contains(logContent, "/dashboards/") {
+		return ""
+	}
+	if !strings.Contains(logContent, "method=GET") {
+		return ""
+	}
+	if !strings.Contains(logContent, `msg="Request Completed"`) {
+		return ""
+	}
+
+	matches := dashboardPath.FindStringSubmatch(logContent)
+	require.Len(t, matches, 2, "log contains /dashboards/ but doesn't match expected path format: %s", logContent)
+
+	return matches[1]
 }
 
 func (l *lokiLogConsumer) Accept(log testcontainers.Log) {
-	timestamp := time.Now().UTC()
+	if l.stopped.Load() {
+		return
+	}
 
-	for matcher, at := range l.timestamps {
-		if strings.Contains(string(log.Content), matcher) {
-			timestamp = at
-			break
+	timestamp := time.Now().UTC()
+	logContent := string(log.Content)
+
+	if name := extractDashboardName(l.t, logContent); name != "" {
+		if ts, ok := l.timestamps[name]; ok {
+			timestamp = ts
 		}
 	}
 

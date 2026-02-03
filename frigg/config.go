@@ -96,6 +96,8 @@ func (c *Config) defaults() {
 	c.Prune.ChunkSize = 4 * time.Hour
 	c.Backup.GitHub.Branch = "main"
 	c.Backup.GitHub.Directory = "deleted-dashboards"
+	defaultQueryLimit := 100
+	c.Loki.QueryLimit = &defaultQueryLimit
 }
 
 // load configuration from a YAML file at path.
@@ -155,7 +157,7 @@ func mustParseURL(rawURL string) *url.URL {
 }
 
 // Initialise Frigg from the provided Config.
-// This assumes that the provided Config has already been validated and might panic if not.
+// Initialise assumes that the provided Config has already been validated and might panic if not.
 func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, secrets *Secrets) (*Frigg, error) {
 	s := server.New(c.Server, logger)
 
@@ -166,7 +168,7 @@ func (c *Config) Initialise(logger *slog.Logger, gatherer prometheus.Gatherer, s
 		TenantID:   c.Loki.TenantID,
 		HTTPClient: httpClient,
 		Logger:     logger,
-		Limit:      100,
+		Limit:      *c.Loki.QueryLimit,
 	})
 
 	grafanaURL := mustParseURL(c.Grafana.Endpoint)
