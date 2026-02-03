@@ -114,7 +114,7 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 			var err error
 			logs, err = client.QueryRange(t.Context(), query, queryStart, queryEnd)
 			assert.NoError(collect, err)
-			assert.Len(collect, logs, 4, "Expected exactly 4 logs, got %d", len(logs))
+			assert.Len(collect, logs, 4)
 		}, 10*time.Second, 50*time.Millisecond)
 
 		seenMessages := make(map[string]int)
@@ -122,11 +122,11 @@ func TestClient_QueryRange_Integration(t *testing.T) {
 			seenMessages[log.Message()]++
 		}
 
-		assert.Len(t, seenMessages, 4, "Expected 4 unique log messages (indicates duplicates or missed logs)")
-		assert.Equal(t, 1, seenMessages["log-A-1"], "log-A-1 should appear exactly once")
-		assert.Equal(t, 1, seenMessages["log-A-2"], "log-A-2 should appear exactly once")
-		assert.Equal(t, 1, seenMessages["log-B-1"], "log-B-1 should appear exactly once")
-		assert.Equal(t, 1, seenMessages["log-B-2"], "log-B-2 should appear exactly once")
+		assert.Len(t, seenMessages, 4)
+		assert.Equal(t, 1, seenMessages["log-A-1"])
+		assert.Equal(t, 1, seenMessages["log-A-2"])
+		assert.Equal(t, 1, seenMessages["log-B-1"])
+		assert.Equal(t, 1, seenMessages["log-B-2"])
 
 		timestampByMessage := make(map[string]time.Time)
 		for _, log := range logs {
