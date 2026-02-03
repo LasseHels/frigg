@@ -304,10 +304,10 @@ func assertEqualKeys(t *testing.T, expected []string, actual map[string][]*http.
 type lokiLogConsumer struct {
 	loki       *integrationtest.Loki
 	t          *testing.T
-	timestamps map[string]time.Time // dashboard name -> timestamp
+	timestamps map[string]time.Time
 }
 
-var dashboardPathRe = regexp.MustCompile(`/apis/dashboard\.grafana\.app/v1beta1/namespaces/[^/]+/dashboards/([^/\s]+)`)
+var dashboardPath = regexp.MustCompile(`/apis/dashboard\.grafana\.app/v1beta1/namespaces/[^/]+/dashboards/([^/\s]+)`)
 
 // extractDashboardName extracts the dashboard name from a Grafana log line's path field.
 // Returns empty string if the log is not a dashboard request.
@@ -323,8 +323,8 @@ func extractDashboardName(t *testing.T, logContent string) string {
 		return ""
 	}
 
-	matches := dashboardPathRe.FindStringSubmatch(logContent)
-	require.NotEmpty(t, matches, "log contains /dashboards/ but doesn't match expected path format: %s", logContent)
+	matches := dashboardPath.FindStringSubmatch(logContent)
+	require.Len(t, matches, 2, "log contains /dashboards/ but doesn't match expected path format: %s", logContent)
 
 	return matches[1]
 }
