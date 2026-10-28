@@ -325,6 +325,84 @@ func TestNewConfig(t *testing.T) {
 			expectedError: "validating configuration: Key: 'Config.Prune.MaxDeletions' Error:" +
 				"Field validation for 'MaxDeletions' failed on the 'min' tag",
 		},
+		"min age custom value": {
+			configPath: "testdata/min_age_custom.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:            true,
+					Interval:       10 * time.Minute,
+					Period:         720 * time.Hour,
+					Labels:         map[string]string{"app": "grafana"},
+					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
+					MinAge:         durationPtr(time.Hour),
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"min age zero": {
+			configPath: "testdata/min_age_zero.yaml",
+			expectedConfig: &frigg.Config{
+				Log: log.Config{
+					Level: slog.LevelInfo,
+				},
+				Server: server.Config{
+					Host: "localhost",
+					Port: 8080,
+				},
+				Loki: loki.Config{
+					Endpoint:   "http://loki.example.com",
+					QueryLimit: intPtr(100),
+				},
+				Grafana: grafana.Config{
+					Endpoint: "http://example.com",
+				},
+				Prune: grafana.PruneConfig{
+					Dry:            true,
+					Interval:       10 * time.Minute,
+					Period:         720 * time.Hour,
+					Labels:         map[string]string{"app": "grafana"},
+					LowerThreshold: 10,
+					ChunkSize:      4 * time.Hour,
+					MinAge:         durationPtr(0),
+				},
+				Backup: frigg.BackupConfig{
+					GitHub: github.Config{
+						Repository: exampleRepository(t),
+						Branch:     "main",
+						Directory:  "deleted-dashboards",
+					},
+				},
+			},
+			expectedError: "",
+		},
+		"negative min age": {
+			configPath:     "testdata/min_age_negative.yaml",
+			expectedConfig: nil,
+			expectedError: "validating configuration: Key: 'Config.Prune.MinAge' Error:" +
+				"Field validation for 'MinAge' failed on the 'min' tag",
+		},
 		"chunk size below minimum": {
 			configPath:     "testdata/chunk_size_below_minimum.yaml",
 			expectedConfig: nil,
@@ -730,4 +808,8 @@ func exampleRepository(t testing.TB) github.Repository {
 
 func intPtr(i int) *int {
 	return &i
+}
+
+func durationPtr(d time.Duration) *time.Duration {
+	return &d
 }

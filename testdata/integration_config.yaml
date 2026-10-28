@@ -12,6 +12,7 @@ prune:
   dry: false
   interval: '1s'
   period: '10m'
+  min_age: '0s'
   ignored_users:
     - 'sa-1-john-doe'
   labels:

@@ -23,7 +23,8 @@ is considered used and will not be deleted.
 > [!IMPORTANT]
 > Frigg will never delete dashboards that:
 >   1. Are [provisioned](https://grafana.com/docs/grafana/v12.2/administration/provisioning/#dashboards) _or_
->   2. Have tags matching the configured skip list (see [Configuration](#configuration)).
+>   2. Have tags matching the configured skip list _or_
+>   3. Were created more recently than the configured `prune.min_age` (see [Configuration](#configuration)).
 
 ## Configuration
 
@@ -156,6 +157,11 @@ prune:
   #
   # Optional.
   max_deletions: 10
+  # Minimum age a dashboard must have before Frigg can delete it. A new dashboard has had no time to be read, so Frigg
+  # cannot tell whether it is unused. Dashboards created less than min_age ago are skipped.
+  #
+  # This value must be a valid Go duration string and must not be negative (default: the value of period).
+  min_age: '1440h'
 
 backup:
   github:

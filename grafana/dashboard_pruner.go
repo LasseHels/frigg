@@ -32,6 +32,7 @@ type DashboardPruner struct {
 	skipTags       []string
 	maxDeletions   *int
 	chunkSize      time.Duration
+	minAge         time.Duration
 }
 
 type NewDashboardPrunerOptions struct {
@@ -65,6 +66,8 @@ type NewDashboardPrunerOptions struct {
 	// ChunkSize is the size of time chunks when querying Loki for dashboard usage logs.
 	// See also UsedDashboardsOptions.ChunkSize.
 	ChunkSize time.Duration
+	// MinAge is the minimum age a dashboard must have before it can be deleted. If nil, Period is used.
+	MinAge *time.Duration
 }
 
 func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
@@ -72,6 +75,11 @@ func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 		slog.Bool("dry", opts.Dry),
 		slog.String("namespace", opts.Namespace),
 	)
+
+	minAge := opts.Period
+	if opts.MinAge != nil {
+		minAge = *opts.MinAge
+	}
 
 	return &DashboardPruner{
 		grafana:        opts.Grafana,
@@ -86,6 +94,7 @@ func NewDashboardPruner(opts *NewDashboardPrunerOptions) *DashboardPruner {
 		skipTags:       opts.SkipTags,
 		maxDeletions:   opts.MaxDeletions,
 		chunkSize:      opts.ChunkSize,
+		minAge:         minAge,
 	}
 }
 
@@ -154,6 +163,17 @@ func (d *DashboardPruner) prune(ctx context.Context) error {
 				slog.Int("reads", usage.Reads()),
 				slog.Int("users", usage.Users()),
 				slog.String("range", d.period.String()),
+			)
+			continue
+		}
+
+		// A dashboard younger than the minimum age has not existed long enough for its lack of reads to show that it is
+		// unused.
+		if time.Since(dashboard.CreationTimestamp) < d.minAge {
+			dashboardLogger.Debug(
+				"Skipping recently created dashboard",
+				slog.Time("created", dashboard.CreationTimestamp),
+				slog.String("min_age", d.minAge.String()),
 			)
 			continue
 		}
